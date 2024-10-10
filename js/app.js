@@ -16,6 +16,9 @@ SUAMVOU7IIH2XY4Z3HK77CGLC6EHIGSZITHS77B6AJKK24IGXUWIZKOI4U
 
 (async () => {
 
+    if(nats_core === undefined || nats_core === null) alert("Ваш браузер устарел, и не может поддерживать данное приложение.");
+    else {
+        
     const nc = await nats_core.wsconnect({
         servers: "wss://connect.ngs.global", //  ws://localhost:8080 wss://demo.nats.io:8443 tls://connect.ngs.global
         authenticator: nats_core.credsAuthenticator(new TextEncoder().encode(creds)),
@@ -91,6 +94,7 @@ SUAMVOU7IIH2XY4Z3HK77CGLC6EHIGSZITHS77B6AJKK24IGXUWIZKOI4U
         }
 
         return 4;
+    }
     }
 
 })();
