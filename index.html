@@ -102,41 +102,6 @@
                         <!--ПОИСК-->
                         <div class="razdel">
                             <h2><span id="spinner-search" style="display: none;"><img src="https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/img/spinner-min.gif">&nbsp;&nbsp;</span>Поиск по Сайту</h2>
-                            <form action="https://s2.chenneling.info:5002/search/" id="searchForm" method="get" onsubmit="beforeSearch(event)" data-ajax="true" data-ajax-method="get" data-ajax-update=".page-main" data-ajax-loading="#spinner-search" data-ajax-success="successSearch" data-ajax-failure="failedSearch">
-                                <input name="FirstQuery" value="true" type="hidden">
-                                <div class="txt-blue" id="search">
-                                    <div class="search-group">
-                                        <div class="input-search-group"><input class="srch" type="text" id="SearchString" name="SearchString" value=""> </div>
-                                        <div class="list-search-group"><input class="btn-search" id="s2" value="&gt;&gt;" type="submit"> </div>
-                                    </div>
-                                    <div class="clear"></div>
-                                    <div>
-                                        <div class="where-search-block">
-                                            <select class="style-select where-search" data-val="true" data-val-required="The Where field is required." id="Where" name="Where">
-                                                <option selected="selected" value="0">в Посланиях</option>
-                                                <option value="1">в Катренах</option>
-                                                <option value="2">в заголовках</option>
-                                                <option value="3">по всему Сайту</option>
-                                                <option value="4">по дате</option>
-                                                <option value="5">в цитатах</option>
-                                            </select>
-                                        </div>
-                                        <div class="find txt-blue">искать</div>
-                                    </div>
-                                    <div id="advSearch" hidden="">
-                                        <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapseAdvSearch" aria-expanded="false" aria-controls="collapseAdvSearch" title="Расширенный поиск">
-                                            <span class="glyphicon glyphicon-chevron-down" aria-hidden="true" style="font-size: large; top: 3px"></span>
-                                        </button>
-                                        <div class="collapse" id="collapseAdvSearch" aria-expanded="false" style="height: 0px;">
-                                            <div class="well" style="background-color: transparent;">
-                                                <input type="checkbox" title="Точное совпадение с началом и окончанием слова" data-val="true" data-val-required="The IsFullWord field is required." id="IsFullWord" name="IsFullWord" value="true">&nbsp;&nbsp;полное совпадение<br>
-                                                <input type="checkbox" title="Точное совпадение с началом слова и любое окончание слова" data-val="true" data-val-required="The IsExactStart field is required." id="IsExactStart" name="IsExactStart" value="true">&nbsp;&nbsp;точное начало
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <input name="IsFullWord" type="hidden" value="false"><input name="IsExactStart" type="hidden" value="false">
-                            </form>
                         </div>
                         <!--КАЛЕНДАРЬ-->
                         <!--<script>var minyear = 2004;</script>
