@@ -14,9 +14,6 @@ SUAMVOU7IIH2XY4Z3HK77CGLC6EHIGSZITHS77B6AJKK24IGXUWIZKOI4U
 *************************************************************
 `;
 
-window.onerror = function(message, url, line, col, error) {
-        alert(`${message}\n В ${line}:${col} на ${url}`);
-};
 
 if(nats_core === undefined || nats_core === null) alert("Ваш браузер устарел, и не может поддерживать данное приложение.");
 else {
