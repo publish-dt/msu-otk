@@ -16,7 +16,7 @@ SUAMVOU7IIH2XY4Z3HK77CGLC6EHIGSZITHS77B6AJKK24IGXUWIZKOI4U
 
 (async () => {
 
-    const nc = await nats_core.wsconnect({
+    /*const nc = await nats_core.wsconnect({
         servers: "wss://connect.ngs.global", //  ws://localhost:8080 wss://demo.nats.io:8443 tls://connect.ngs.global
         authenticator: nats_core.credsAuthenticator(new TextEncoder().encode(creds)),
         //user: "client",
@@ -27,27 +27,27 @@ SUAMVOU7IIH2XY4Z3HK77CGLC6EHIGSZITHS77B6AJKK24IGXUWIZKOI4U
     console.log(`connected to ${nc.getServer()}`);
 
     const sc = new nats_core.StringCodec();
-    const jc = new nats_core.JSONCodec();
+    const jc = new nats_core.JSONCodec();*/
 
 
     boost.onclick = function (event) {
         if (event.target.nodeName != 'A') return;
 
         let href = event.target.getAttribute('href');
-        //alert(href); // может быть подгрузка с сервера, генерация интерфейса и т.п.
-        getData(href);
+        alert(href); // может быть подгрузка с сервера, генерация интерфейса и т.п.
+        //getData(href);
 
         return false; // отменить действие браузера (переход по ссылке)
     };
 
     window.addEventListener("unload", async function (e) {
 
-        const done = nc.closed(); // nc.drain(); // drain используется когда есть подписки, чтобы их корректно завершить. И close уже не надо.
+        /*const done = nc.closed(); // nc.drain(); // drain используется когда есть подписки, чтобы их корректно завершить. И close уже не надо.
         await nc.close();
         const err = await done;
         if (err) {
             console.log(`error closing:`, err);
-        }
+        }*/
 
         //return "Do you really want to close?";  //Webkit, Safari, Chrome
     });
