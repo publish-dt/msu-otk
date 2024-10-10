@@ -576,6 +576,13 @@
 
     </div><!-- end #page -->
 
+    <script>
+        var nats_core = undefined;
+        window.onerror = function(message, url, line, col, error) {
+            alert(`${message}\n В ${line}:${col} на ${url}`);
+        };        
+    </script>
+    
     <!--
     <script src="./js/bundle.js"></script>
     <script type="text/javascript" src="./js/app.js"></script>-->
