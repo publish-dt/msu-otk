@@ -18,7 +18,7 @@
 body {
 	min-height: 100%;
 	/*  margin: 0px 1%;*/
-	background: #000 url("/_content/MSU.View.Otk/img/stars.gif") repeat fixed 0% 0%;
+	background: #000 url("https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/img/stars.gif") repeat fixed 0% 0%;
 	color: #e8e8e8 /*#FFFFFF*/; /*цвет текста на сайте*/
 	font-family: 'MyriadProCondensed', sans-serif;
 	font-weight: 400;
@@ -250,7 +250,7 @@ td{
 	position: relative;
 	height: auto; /*резиновая высота*/
 	width: auto;
-	background: transparent url("/_content/MSU.View.Otk/img/header.jpg") no-repeat scroll left top; /*картинка-фон слева*/
+	background: transparent url("https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/img/header.jpg") no-repeat scroll left top; /*картинка-фон слева*/
 	border-left: 3px solid #69C;
 	border-bottom: 2px solid #69C;
 }
