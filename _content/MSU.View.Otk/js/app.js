@@ -15,8 +15,8 @@ SUAMVOU7IIH2XY4Z3HK77CGLC6EHIGSZITHS77B6AJKK24IGXUWIZKOI4U
 `;
 //var nKey = "";
 
-var prefixDev = "dev."; // 
-var isWS = true; // false 
+var prefixDev = ""; // 
+var isWS = false; // false 
 
 (async () => {
 
