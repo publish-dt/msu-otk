@@ -3,22 +3,22 @@
 
 /*@font-face {
    font-family:MyriadProCondensed;
-          src:url('../fonts/MyriadPro-Cond.eot'),
-          url('../fonts/MyriadPro-Cond.woff') format('woff');
+          src:url('/_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot'),
+          url('/_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff') format('woff');
 }*/
 @font-face {
 	font-family: MyriadProCondensed;
-	src: url('https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot');
-	src: url('https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot?#iefix') format('embedded-opentype'),
-		url('https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff') format('woff'),
-		url('https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/fonts/MyriadPro-Cond.otf') format('opentype'),
-		url('https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/fonts/MyriadPro-Cond.svg#MyriadPro-Cond') format('svg');
+	src: url('/_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot');
+	src: url('/_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot?#iefix') format('embedded-opentype'),
+		 url('/_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff') format('woff'),
+		 url('/_content/MSU.View.Otk/fonts/MyriadPro-Cond.otf') format('opentype'),
+		 url('/_content/MSU.View.Otk/fonts/MyriadPro-Cond.svg#MyriadPro-Cond') format('svg');
 }
 
 body {
 	min-height: 100%;
 	/*  margin: 0px 1%;*/
-	background: #000 url("https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/img/stars.gif") repeat fixed 0% 0%;
+	background: #000 url("/_content/MSU.View.Otk/img/stars.gif") repeat fixed 0% 0%;
 	color: #e8e8e8 /*#FFFFFF*/; /*цвет текста на сайте*/
 	font-family: 'MyriadProCondensed', sans-serif;
 	font-weight: 400;
@@ -250,8 +250,8 @@ td{
 	position: relative;
 	height: auto; /*резиновая высота*/
 	width: auto;
-	background: transparent url("https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/img/header.jpg") no-repeat scroll left top; /*картинка-фон слева*/
-	border-left: 3px solid #69C;
+    background: transparent url("/_content/MSU.View.Otk/img/header.jpg") no-repeat scroll left top; /*картинка-фон слева*/
+    border-left: 3px solid #69C;
 	border-bottom: 2px solid #69C;
 }
 /*Название сайта на картинке "Благая весть"*/
@@ -1188,9 +1188,10 @@ P.c3 {
 
 /* Текст Катрена */
 P.poem {
-    margin: 12pt 0;
-    text-indent: 0;
+	margin: 12pt 0;
+	text-indent: 0;
 	text-align: left;
+	display: block;
 }
 P.poem1 {
 	margin:12pt 0 12pt 23px;
@@ -1496,100 +1497,100 @@ form #lt_box {
 /*дополнения к основным стилям (для мультитенантности)*/
 
 /*Название сайта на картинке "Откровения"*/
-.blagayavest {
-    position: absolute;
-    top: 8px;
-    left: 34px;
-    font-size: 37px;
-    font-weight: unset;
-    font-family: sans-serif;
+.otk-sitename {
+	position: absolute;
+	top: 8px;
+	left: 34px;
+	font-size: 37px;
+	font-weight: unset;
+	font-family: sans-serif;
 }
 
 /*Название сайта на картинке "людям нового века"*/
 .site-sub-name {
-    position: absolute;
-    top: 44px;
-    left: 36px;
-    font-size: 36px;
+	position: absolute;
+	top: 44px;
+	left: 36px;
+	font-size: 36px;
 }
 
 @media screen and (max-width: 767px) {
-    .blagayavest {
-        position: static;
-        padding-top: 10px;
-        padding-left: 15px;
-        padding-right: 15px;
-        font-size: 27px;
-        line-height: 40px;
-    }
+	.otk-sitename {
+		position: static;
+		padding-top: 10px;
+		padding-left: 15px;
+		padding-right: 15px;
+		font-size: 27px;
+		line-height: 40px;
+	}
 
-    .site-sub-name {
-        position: static;
-        padding-left: 15px;
-        font-size: 27px;
-    }
+	.site-sub-name {
+		position: static;
+		padding-left: 15px;
+		font-size: 27px;
+	}
 
-    .book {
-        position: absolute;
-        padding-left: 205px;
-        top: 10px/*16px*/;
-        line-height: 22px;
-    }
+	.book {
+		position: absolute;
+		padding-left: 205px;
+		top: 10px /*16px*/;
+		line-height: 22px;
+	}
 }
 
 @media screen and (max-width: 440px) {
-    .blagayavest {
-        position: static;
-        padding-top: 10px;
-        padding-left: 15px;
-        padding-right: 15px;
-        font-size: 27px;
-        line-height: 40px;
-    }
+	.otk-sitename {
+		position: static;
+		padding-top: 10px;
+		padding-left: 15px;
+		padding-right: 15px;
+		font-size: 27px;
+		line-height: 40px;
+	}
 
-    .site-sub-name {
-        position: static;
-        padding-left: 15px;
-        font-size: 27px;
-    }
+	.site-sub-name {
+		position: static;
+		padding-left: 15px;
+		font-size: 27px;
+	}
 
-    .book {
-        position: absolute;
-        padding-left: 205px;
-        top: 5px;
-        line-height: 22px;
-        font-size: 16px;
-    }
+	.book {
+		position: absolute;
+		padding-left: 205px;
+		top: 5px;
+		line-height: 22px;
+		font-size: 16px;
+	}
 }
 
 @media screen and (max-width: 350px) {
-    .blagayavest {
-        position: static;
-        padding-top: 10px;
-        padding-left: 15px;
-        padding-right: 15px;
-        font-size: 27px;
-        line-height: 40px;
-    }
+	.otk-sitename {
+		position: static;
+		padding-top: 10px;
+		padding-left: 15px;
+		padding-right: 15px;
+		font-size: 27px;
+		line-height: 40px;
+	}
 
-    .site-sub-name {
-        position: static;
-        padding-left: 15px;
-        font-size: 27px;
-    }
+	.site-sub-name {
+		position: static;
+		padding-left: 15px;
+		font-size: 27px;
+	}
 
-    .book {
-        position: static;
-        padding-left: 17px;
-        line-height: 22px;
-        font-size: 16px;
-    }
+	.book {
+		position: static;
+		padding-left: 17px;
+		line-height: 22px;
+		font-size: 16px;
+	}
 }
 
 
 /* курсив в текстах (например стихи в Посланиях) */
 SPAN.c2, SPAN.c3, SPAN.c4, SPAN.c5 {
-    text-indent: 0;
-    font-style: italic;
-    color: #fff;
+	text-indent: 0;
+	font-style: italic;
+	color: #fff;
 }
