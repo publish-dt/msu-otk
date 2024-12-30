@@ -1,218 +1,111 @@
-var creds = `
------BEGIN NATS USER JWT-----
-eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJXRkpKU0NKNTM0RDZIVDNWQVpHRkpUVVZON0xIT05QSU5OSEFGUVhFWEdaVEU0WTNHMkVRIiwiaWF0IjoxNzI3MTk4NTk5LCJpc3MiOiJBQVBVT000M1NZNFRTSVhURU9aVTdUMlg2VkpIVExKR0RXWjJOWFM3VUhCVlFRTUZXWklYQVVWRyIsIm5hbWUiOiJ3ZWIiLCJzdWIiOiJVQ1YzUlROQk03M0dDSktXRkFVTDJFUUhVQkkyVDVLWkJFNURUQ1dNTzZYWkxHWU0yQkFZRFFVQiIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIk1TVS5SZXEuTWFpbiJdfSwic3ViIjp7fSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwiaXNzdWVyX2FjY291bnQiOiJBQkVNR0RSQ01YM0JZQU81RFcyVTVKNllEWlVOTlY0T1BTUkpMQVg2TUg3M0NMWTdUUTNUNzRCTyIsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.LAhaBMHIkPz9WjRtknkR3DT435Nfc3Tnqe7LssxTLc9yyZM7Qdzz0SMFs86WJQmE3sEs5r2p2dGYDwG5YR-bCw
-------END NATS USER JWT------
+﻿let prefixDev = "";
+let hostname = "http://2.56.88.201";
+if (false) { // это режим разработки
+    prefixDev = "dev.";
+    hostname = hostname+":8081";
+}
+const staticBase = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main";
 
-************************* IMPORTANT *************************
-NKEY Seed printed below can be used to sign and prove identity.
-NKEYs are sensitive and should be treated as secrets.
-
------BEGIN USER NKEY SEED-----
-SUAMVOU7IIH2XY4Z3HK77CGLC6EHIGSZITHS77B6AJKK24IGXUWIZKOI4U
-------END USER NKEY SEED------
-
-*************************************************************
-`;
-//var nKey = "";
-
-var prefixDev = ""; // dev.
-var isWS = true; // false 
-
-(async () => {
-
-    if (nats_core === undefined || nats_core === null) {
-        isWS = false;
-        alert("Ваш браузер устарел, и не может поддерживать данное приложение.");
-    }
-    else {
-        try {
-            var nc = await nats_core.wsconnect({
-                servers: "ws://2.56.88.201:81", //  wss://connect.ngs.global ws://localhost:81 wss://demo.nats.io:8443 tls://connect.ngs.global
-                //authenticator: nats_core.nkeyAuthenticator(new TextEncoder().encode(nKey)),
-                //authenticator: nats_core.credsAuthenticator(new TextEncoder().encode(creds)),
-                user: "web", // создать отдельного пользователя для тестирования
-                pass: "web",
-                name: "Web-Client"
-            });
-
-            console.log(`connected to ${nc.getServer()}`);
-
-        } catch (_err) {
-            console.log(`error connecting: ${JSON.stringify(_err.message)}`);
-        }
-
-        var sc = new nats_core.StringCodec();
-        var jc = new nats_core.JSONCodec();
-
-    }
-    boost.onclick = function (event) {
-        if (event.target.nodeName != 'A') return;
-
-        let href = event.target.getAttribute('href');
-        //alert(href); // может быть подгрузка с сервера, генерация интерфейса и т.п.
-        getData(href);
-
-        return false; // отменить действие браузера (переход по ссылке)
-    };
-
-    window.addEventListener("unload", async function (e) {
-
-        const done = nc.closed(); // nc.drain(); // drain используется когда есть подписки, чтобы их корректно завершить. И close уже не надо.
-        await nc.close();
-        const err = await done;
-        if (err) {
-            console.log(`error closing:`, err);
-        }
-
-        //return "Do you really want to close?";  //Webkit, Safari, Chrome
-    });
-
-
-    async function getData(url) {
-
-        try {
-            var res = undefined;
-            var dataResp = undefined;
-
-            if (isWS) {
-                // ЖЕЛАТЕЛЬНО реализовать минимальный набор headers: User-Agent="..."; Method="Get"; Accept="*/*"; 
-
-                //const data = nats_core.JSONCodec((this_, key, value) => { return value; }).encode({"p": 5});
-                var dataReq = jc.encode({ path: url, onlyApi: true }); // ["hello", 5] sc.encode(String(4))
-
-                var response = await nc.request(prefixDev + "MSU.Req.Main", dataReq, { timeout: 15000 }); // MSU.Req.Main
-                if (response.headers) {
-                    /*for (const [key, value] of response.headers) {
-                        console.log(`${key}=${value}`);
-                    }*/
-                    console.error("При получении данных возникла ошибка! Код ошибки: ", response.headers.get("Nats-Service-Error-Code"));
-                }
-                else {
-                    //const numbers = nats_core.JSONCodec<number[]>().decode(response.data);
-                    res = jc.decode(response.data);
-                    //res = sc.decode(response.data);
-                }
-            }
-            else {
-                var response = await fetch("http://2.56.88.201" + url); // http://localhost:8888 http://localhost:8080/api/MSU/Main?path=
-                if (response.ok) { // если HTTP-статус в диапазоне 200-299
-                    //res0 = await response.text();
-                    res = await response.json();
-                } else {
-                    alert("Ошибка HTTP: " + response.status);
-                }
-            }
-
-            if (res.code == undefined && res.content != undefined) {
-                console.log(`Данные от сервиса получены.`);
-                dataResp = res; // res.result.model;
-            }
-            else console.error(`Произошла ошибка в сервисе: ${res.code}, ${res.message}`);
-
-            if (dataResp !== undefined) {
-
-                var el_content = document.querySelector("#Content");
-
-                /*var el_title = document.querySelector("#Title");
-                el_title.innerHTML = res.Name;
-    
-                var el_description = document.querySelector("#Description");
-                el_description.innerHTML = res.Description;*/
-
-                //const scriptHTML = `<script>alert("Alert from innerHTML");</script>`;
-                if (dataResp.content !== undefined) {
-                    el_content.innerHTML = dataResp.content; // scriptHTML;// 
-
-                    //console.log(`Отображены данные: ${data.content}`);
-                    window.scroll(0, 0);
-                }
-            }
-        } catch (ex) {
-            if (ex.code == "503")
-                console.error(`Сервис для ответа не запущен. Ошибка: ${JSON.stringify(ex)}`);
-            else if (ex.code == "TIMEOUT")
-                console.error(`Сервис долго не отвечает. Ошибка: ${JSON.stringify(ex)}`);
-            else
-                console.error(`Ошибка от сервиса: ${ex}`);
-        }
-
-
-
-        return 4;
-    }
-
-    if (false) getTest(); // это только для того, чтобы функция getTest была видна, иначе она обрезается, т.к. нигде не используется.
-
-    window.getImgData = async (imgEl/*url, id*/) => {
-        var res = undefined;
-        var data = undefined;
-        var url = imgEl.getAttribute("src");
-
-        try {
-            if (isWS) {
-                var dataReq = jc.encode({ path: url, onlyApi: true });
-
-                var response = await nc.request(prefixDev + "MSU.Req.Files", dataReq, { timeout: 15000 });
-                if (response.headers) {
-                    /*for (const [key, value] of response.headers) {
-                        console.log(`${key}=${value}`);
-                    }*/
-                    console.error("При получении изображения возникла ошибка! Код ошибки: ", response.headers.get("Nats-Service-Error-Code"));
-                }
-                else {
-                    //imgEl.src = URL.createObjectURL(response.data); // нельзя здесь это использовать, т.к. данные здесь в виде обычных байт, а не подготовленных для передачи изображения через http
-                    var base64String = base64js.fromByteArray(response.data);
-                    var src = "data:image/jpg;base64," + base64String;
-                    imgEl.setAttribute("src", src);
-                }
-            }
-            else {
-                var response = await fetch("http://2.56.88.201" + url); // http://localhost:8888 http://localhost:8080/api/MSU/Main?path=
-                /*fetch("http://2.56.88.201" + url)
-                    .then(response => response.blob())
-                    .then(data =>
-                        imgEl.src = URL.createObjectURL(data)
-                    );*/
-
-                if (response.ok) { // если HTTP-статус в диапазоне 200-299
-                    //res = await response.json();
-                    res = await response.blob();
-                } else {
-                    alert("Ошибка HTTP: " + response.status);
-                }
-
-                if (res.code == undefined && res.size != undefined) {
-                    console.log(`Данные от сервиса получены.`);
-                    data = res; // res.result.model;
-                }
-                else console.error(`Произошла ошибка в сервисе: ${res.code}, ${res.message}`);
-
-                if (data !== undefined) {
-                    imgEl.src = URL.createObjectURL(data);
-                }
-            }
-        } catch (ex) {
-            if (ex.code == "503")
-                console.error(`Сервис для ответа не запущен. Ошибка: ${JSON.stringify(ex)}`);
-            else if (ex.code == "TIMEOUT")
-                console.error(`Сервис долго не отвечает. Ошибка: ${JSON.stringify(ex)}`);
-            else
-                console.error(`Ошибка от сервиса: ${ex}`);
-        }
-
-    }
-
-})();
-
-
-function openImg(imgEl) {
-    var dataImg = imgEl.src;// document.getElementById(id).src;
-    var imgElement = "<img width='100%' src='" + dataImg + "' />";
-    var win = window.open();
-    win.document.write(imgElement);
+window.onload = function () {
+    onLoadMain();
+    if (typeof siteID !== 'undefined' && siteID === 'Poems') backTop();
+    if (typeof typeContent !== 'undefined' && typeContent === 'Poem') tooltipstering();
 }
 
-/*function getImgData(url, id) {
-    alert(url);
-    alert(id);
-}*/
+function onLoadMain() {
+    let toggleBtn = document.getElementsByClassName('navbar-toggle')[0];
+    let menu = document.getElementById('bs-navbar');
+
+    toggleBtn.addEventListener('click', function () {
+        menu.classList.toggle('in');
+    });
+}
+
+function isAutonomy() {
+    if (location.hostname === "")
+        return true;
+    else
+        return false;
+}
+
+function backTop() {
+
+    let topEl = document.getElementById("back-top");
+    topEl.style.display = 'none';
+    window.onscroll = function () {
+        var scrollTop = window.scrollY || document.body.scrollTop || document.documentElement.scrollTop || 0;
+        //console.info("window.scrollY", scrollTop);
+        if (scrollTop > 200) {
+            topEl.style.display = '';
+        } else {
+            topEl.style.display = 'none';
+        }
+    };
+    /*topEl.addEventListener('click', function () {
+        window.scroll(0, 0);
+        return false;
+    });*/
+}
+
+// устанавливаем для автономного режима путь статических ресурсов (изображений)
+function imgSetSrc() {
+    if (location.hostname === "") { // это для автономного режима
+        let elements = document.getElementsByTagName('img');
+        for (let i = 0; i < elements.length; i++) {
+            const element = elements[i];
+            if (element == null) continue;
+
+            let src = element.getAttribute("src");
+            let imgHost = staticBase;
+            if (src.indexOf('cnt/') !== -1) continue; // imgHost = hostname; //  пропускаем изображения из БД
+            element.src = imgHost + (src.indexOf('/') === 0 ? "" : "/") + src;
+        }
+    }
+}
+
+// для автономного режима получаем путь/байты изображения
+window.getImgData = function (imgEl) {
+    if (location.hostname === "") { // это для автономного режима
+        imgEl.src = hostname + imgEl.getAttribute("src");
+    }
+}
+
+function openImg(imgEl) {
+    if (location.hostname === "") { // это для автономного режима
+        var dataImg = imgEl.getAttribute("src"); //imgEl.src;// document.getElementById(id).src;
+        var imgElement = "<img width='100%' src='" + dataImg + "' />";
+        var win = window.open();
+        win.document.write(imgElement);
+    }
+}
+
+function tooltipstering() {
+    //debugger;
+    //alert('test 03');
+    let counterNumbPoem = 1;
+    const pageMain = document.getElementsByClassName('sm-poem-blok'); // page-main
+    if (pageMain.length > 0) pageMainEl = pageMain[0];
+    let elements = pageMainEl.children;
+    for (let i = 0; i < elements.length; i++) {
+        const element = elements[i]
+        if (element == null) continue
+
+        if (element.className.toLowerCase() === "page-title" || element.className.toLowerCase() === "next") counterNumbPoem = 1;
+        if (element.classList.contains("poem")) {
+            element.classList.add('hint--left');
+            element.classList.add('hint--no-arrow');
+            element.classList.add('hint--no-animate');
+            element.setAttribute('aria-label', counterNumbPoem);
+
+            counterNumbPoem++;
+        }
+    }
+}
+
+document.body.addEventListener('htmx:configRequest', function (evt) {
+    //debugger;
+    if (location.hostname === "") { // это для автономного режима
+        evt.detail.headers['MSU-Dev'] = prefixDev;
+        evt.detail.path = hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path; //
+    }
+});
