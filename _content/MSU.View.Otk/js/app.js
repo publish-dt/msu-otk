@@ -108,7 +108,8 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 document.body.addEventListener('htmx:responseError', function (evt) {
     //debugger;
     if (location.hostname !== "" && evt.detail.xhr.status === 404) { // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
-        htmx.trigger(evt.detail.elt, "click", { notfound: true });
+        let trigger = evt.detail.elt.getAttribute('hx-trigger');
+        htmx.trigger(evt.detail.elt, trigger/*"click"*/, { notfound: true });
         //htmx.ajax('GET', hostname + '/' + evt.detail.pathInfo.requestPath, { target: '#main-cont', swap: 'outerHTML' }); // https://v1.htmx.org/api/#ajax
     }
 });
