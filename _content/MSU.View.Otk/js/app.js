@@ -115,7 +115,7 @@ document.body.addEventListener('htmx:responseError', function (evt) {
         }
         else {
             //var base = document.getElementsByTagName('base')[0].getAttribute("href");
-            htmx.ajax('GET', hostname + (evt.detail.pathInfo.requestPath.indexOf('/') === 0 ? "" : "/") + evt.detail.pathInfo.requestPath, { target: '#main-cont', swap: 'outerHTML' }); // https://v1.htmx.org/api/#ajax
+            htmx.ajax('GET', hostname + (evt.detail.pathInfo.requestPath.indexOf('/') === 0 ? "" : "/") + evt.detail.pathInfo.requestPath, { target: '#main-cont'/*, swap: 'outerHTML'*/ }); // https://v1.htmx.org/api/#ajax
         }
     }
 });
