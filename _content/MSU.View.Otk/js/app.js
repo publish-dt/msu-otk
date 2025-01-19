@@ -109,8 +109,13 @@ document.body.addEventListener('htmx:responseError', function (evt) {
     //debugger;
     if (location.hostname !== "" && evt.detail.xhr.status === 404) { // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
         let trigger = evt.detail.elt.getAttribute('hx-trigger');
-        /*if (trigger === null)*/ trigger = "click";
-        htmx.trigger(evt.detail.elt, trigger/*"click"*/, { notfound: true });
-        //htmx.ajax('GET', hostname + '/' + evt.detail.pathInfo.requestPath, { target: '#main-cont', swap: 'outerHTML' }); // https://v1.htmx.org/api/#ajax
+        if (trigger === null) {
+            trigger = "click";
+            htmx.trigger(evt.detail.elt, trigger, { notfound: true });
+        }
+        else {
+            var base = document.getElementsByTagName('base')[0].getAttribute("href");
+            htmx.ajax('GET', hostname + base + evt.detail.pathInfo.requestPath, { target: '#main-cont', swap: 'outerHTML' }); // https://v1.htmx.org/api/#ajax
+        }
     }
 });
