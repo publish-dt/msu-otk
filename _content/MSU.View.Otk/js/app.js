@@ -1,8 +1,10 @@
-﻿let prefix = "";
+﻿let domain = "";
 let hostname = "";
+let isStaticMode = false;
+
+let prefix = "";
 let staticBase = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main";
 let cachePathFile = "_cnt";
-let isStaticMode = false;
 
 
 window.onload = function () {
