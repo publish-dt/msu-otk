@@ -1,4 +1,8 @@
-﻿const cachePathFile = "_cnt";
+﻿let prefix = "";
+let hostname = "";
+let staticBase = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main";
+let cachePathFile = "_cnt";
+let isStaticMode = false;
 
 
 window.onload = function () {
@@ -115,7 +119,7 @@ document.body.addEventListener('htmx:responseError', function (evt) {
         }
         else {
             //var base = document.getElementsByTagName('base')[0].getAttribute("href");
-            htmx.ajax('GET', hostname + (evt.detail.pathInfo.requestPath.indexOf('/') === 0 ? "" : "/") + evt.detail.pathInfo.requestPath, { target: '#main-cont'/*, swap: 'outerHTML'*/ }); // https://v1.htmx.org/api/#ajax
+            htmx.ajax('GET', hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.pathInfo.requestPath, { target: '#main-cont', swap: 'outerHTML' }); // https://v1.htmx.org/api/#ajax
         }
     }
 });
