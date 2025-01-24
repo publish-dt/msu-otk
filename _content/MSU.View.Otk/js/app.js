@@ -11,6 +11,34 @@ window.onload = function () {
     onLoadMain();
     if (typeof siteID !== 'undefined' && siteID === 'Poems') backTop();
     if (typeof typeContent !== 'undefined' && typeContent === 'Poem') tooltipstering();
+
+
+    // управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
+    let listTimeoutID = [];
+    document.querySelectorAll('.hint--left').forEach(box =>
+        box.addEventListener('mouseenter', function (event) {
+            event.target.style.setProperty("--visibility", "visible");
+            timeoutID = window.setTimeout(hiddenTooltip, 1500, event.target);
+            listTimeoutID.push([event.target, timeoutID]);
+        })
+    );
+    document.querySelectorAll('.hint--left').forEach(box =>
+        box.addEventListener('mouseleave', function (event) {
+            for (let i = 0; i < listTimeoutID.length; i++) {
+                if (listTimeoutID[i][0] === event.target) {
+                    window.clearTimeout(listTimeoutID[i][1]);
+                    listTimeoutID.splice(i, 1);
+                    //console.log(listTimeoutID.length);
+                    //hiddenTooltip(event.target);
+                }
+            }
+        })
+    );
+}
+
+// управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
+function hiddenTooltip(el) {
+    el.style.setProperty("--visibility", "hidden");
 }
 
 function onLoadMain() {
@@ -80,9 +108,7 @@ function openImg(imgEl) {
     }
 }
 
-function tooltipstering() {
-    //debugger;
-    //alert('test 03');
+/*function tooltipstering(isPrint=false) {
     let counterNumbPoem = 1;
     const pageMain = document.getElementsByClassName('sm-poem-blok'); // page-main
     if (pageMain.length > 0) pageMainEl = pageMain[0];
@@ -93,19 +119,22 @@ function tooltipstering() {
 
         if (element.className.toLowerCase() === "page-title" || element.className.toLowerCase() === "next") counterNumbPoem = 1;
         if (element.classList.contains("poem")) {
-            element.classList.add('hint--left');
-            element.classList.add('hint--no-arrow');
-            element.classList.add('hint--no-animate');
+            if (!isPrint) {
+                element.classList.add('hint--left');
+                element.classList.add('hint--no-arrow');
+                element.classList.add('hint--no-animate');
+            }
+
             element.setAttribute('aria-label', counterNumbPoem);
 
             counterNumbPoem++;
         }
     }
-}
+}*/
 
 document.body.addEventListener('htmx:configRequest', function (evt) {
     //debugger;
-    if (location.hostname === "" || (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true)) { // это для автономного режима или если при предыдущей попытке не найден
+    if (true || location.hostname === "" || (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true)) { // это для автономного режима или если при предыдущей попытке не найден
         evt.detail.headers['MSU-Dev'] = prefix;
         evt.detail.path = hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path; //
     }

@@ -5,15 +5,15 @@
   src: local("Myriad Pro Condensed"), local("MyriadPro-Cond"), url("../fonts/MyriadPro-Cond.woff") format("woff"), url("../fonts/MyriadPro-Cond.otf") format("opentype"), url("../fonts/MyriadPro-Cond.svg#MyriadPro-Cond") format("svg");
 }
 
-body{
-	min-height: 100%;	
-    background: #fff;
+body {
+	min-height: 100%;
+	background: #fff;
 	color: #000; /*цвет текста на странице печати*/
 	font-family: 'MyriadProCondensed', sans-serif;
 	font-weight: 400;
 	font-size: 20px;
 	overflow-x: hidden;
-	overflow-y: auto;	
+	overflow-y: auto;
 }
 
 /* Content */
@@ -26,8 +26,9 @@ body{
   padding-right: 15px;
 }
 
-.left-print{
-	padding-left: 15pt;
+.left-print {
+	margin-left: 59pt; /* пустое поле слева */
+	padding-left: 25pt; /*было 15pt*/
 	padding-bottom: 24pt;
 }
 /*прерывистая граница слева + внутренние отступы до текста*/
@@ -206,4 +207,11 @@ P.poem {
 #hear {
 	width: 50%;
 	text-align: right;
+}
+
+/* нумерация четверостиший */
+.poem::before {
+	content: attr(aria-label);
+	position: absolute;
+	left: 0px;
 }
