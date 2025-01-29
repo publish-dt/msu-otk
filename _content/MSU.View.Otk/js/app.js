@@ -3,17 +3,46 @@ let hostname = "";
 let isStaticMode = false;
 
 let prefix = "";
-let staticBase = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main";
+let StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // надо дополнительно получать этот хост через ajax, т.к. этот CDN может быть недоступен и приложение будет не работоспособно.
 let cachePathFile = "_cnt";
+
+
+
+/*document.querySelector('.header').style.setProperty("--header-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/header.jpg')");
+document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/stars.gif')");*/
 
 
 window.onload = function () {
     onLoadMain();
+
     if (typeof siteID !== 'undefined' && siteID === 'Poems') backTop();
-    if (typeof typeContent !== 'undefined' && typeContent === 'Poem') tooltipstering();
+    if (typeof typeContent !== 'undefined' && typeContent === 'Poem') {
+        tooltipstering();
+        clearTooltip(); // управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
+    }
 
+}
 
-    // управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
+// управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
+function hiddenTooltip(el) {
+    el.style.setProperty("--visibility", "hidden");
+}
+
+// самые первые действия сразу после загрузки всех ресурсов сайта
+function onLoadMain() {
+
+    // кнопка "гамбургер"
+    let toggleBtn = document.getElementsByClassName('navbar-toggle')[0];
+    let menu = document.getElementById('bs-navbar');
+    toggleBtn.addEventListener('click', function () {
+        menu.classList.toggle('in');
+    });
+
+}
+
+// управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
+function clearTooltip() {
+
     let listTimeoutID = [];
     document.querySelectorAll('.hint--left').forEach(box =>
         box.addEventListener('mouseenter', function (event) {
@@ -34,22 +63,10 @@ window.onload = function () {
             }
         })
     );
+
 }
 
-// управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
-function hiddenTooltip(el) {
-    el.style.setProperty("--visibility", "hidden");
-}
-
-function onLoadMain() {
-    let toggleBtn = document.getElementsByClassName('navbar-toggle')[0];
-    let menu = document.getElementById('bs-navbar');
-
-    toggleBtn.addEventListener('click', function () {
-        menu.classList.toggle('in');
-    });
-}
-
+// проверка, является ли текущее приложение автономным или работает в статическом режиме, например, через GitHub Pages
 function isAutonomy(v) {
     if (location.hostname === "" || isStaticMode === true)
         return true;
@@ -57,6 +74,7 @@ function isAutonomy(v) {
         return false;
 }
 
+// кнопка "Наверх сайта"
 function backTop() {
 
     let topEl = document.getElementById("back-top");
@@ -85,7 +103,7 @@ function imgSetSrc() {
             if (element == null) continue;
 
             let src = element.getAttribute("src");
-            let imgHost = staticBase;
+            let imgHost = StaticResourcesHost;
             if (src.indexOf(cachePathFile+'/') !== -1) continue; // imgHost = hostname; //  пропускаем изображения из БД
             element.src = imgHost + (src.indexOf('/') === 0 ? "" : "/") + src;
         }
@@ -108,40 +126,16 @@ function openImg(imgEl) {
     }
 }
 
-/*function tooltipstering(isPrint=false) {
-    let counterNumbPoem = 1;
-    const pageMain = document.getElementsByClassName('sm-poem-blok'); // page-main
-    if (pageMain.length > 0) pageMainEl = pageMain[0];
-    let elements = pageMainEl.children;
-    for (let i = 0; i < elements.length; i++) {
-        const element = elements[i]
-        if (element == null) continue
-
-        if (element.className.toLowerCase() === "page-title" || element.className.toLowerCase() === "next") counterNumbPoem = 1;
-        if (element.classList.contains("poem")) {
-            if (!isPrint) {
-                element.classList.add('hint--left');
-                element.classList.add('hint--no-arrow');
-                element.classList.add('hint--no-animate');
-            }
-
-            element.setAttribute('aria-label', counterNumbPoem);
-
-            counterNumbPoem++;
-        }
-    }
-}*/
-
 document.body.addEventListener('htmx:configRequest', function (evt) {
-    //debugger;
     if (true || location.hostname === "" || (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true)) { // это для автономного режима или если при предыдущей попытке не найден
         evt.detail.headers['MSU-Dev'] = prefix;
-        evt.detail.path = hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path; //
+        evt.detail.path = hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path;
+
+        //alert("hostname = "+hostname);
     }
 });
 
 document.body.addEventListener('htmx:responseError', function (evt) {
-    //debugger;
     if (location.hostname !== "" && evt.detail.xhr.status === 404) { // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
         let trigger = evt.detail.elt.getAttribute('hx-trigger');
         if (trigger === null) {

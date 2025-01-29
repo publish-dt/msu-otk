@@ -1,8 +1,17 @@
 /*Стили для всего сайта*/
 
 @font-face {
-  font-family: "MyriadProCondensed";
-  src: local("Myriad Pro Condensed"), local("MyriadPro-Cond"), url("../fonts/MyriadPro-Cond.woff") format("woff"), url("../fonts/MyriadPro-Cond.otf") format("opentype"), url("../fonts/MyriadPro-Cond.svg#MyriadPro-Cond") format("svg");
+	font-family: MyriadProCondensed;
+	src: local("Myriad Pro Condensed"), /* чтобы сработало надо в Windows установить MyriadPro-Cond.ttf */
+	local("MyriadPro-Cond"), /* чтобы сработало надо в Windows установить MyriadPro-Cond.ttf */
+	/* если данный стиль загружается из CDN, то и шрифты оттуда же */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff2') format('woff2'), /* Супер новые браузеры */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff') format('woff'), /* Новые браузеры */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.ttf') format('truetype'), /* Safari, Android, iOS */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.otf') format('opentype'), /**/
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot'), /* IE9 Compat Modes */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.svg#MyriadPro-Cond') format('svg'); /* Legacy iOS */
 }
 
 body {

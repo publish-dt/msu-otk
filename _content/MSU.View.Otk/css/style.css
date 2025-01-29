@@ -1,24 +1,24 @@
 /*Стили для всего сайта*/
 /*импортированный шрифт*/
 
-/*@font-face {
-   font-family:MyriadProCondensed;
-          src:url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot'),
-          url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff') format('woff');
-}*/
 @font-face {
 	font-family: MyriadProCondensed;
-	src: url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot');
-	src: url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot?#iefix') format('embedded-opentype'),
-		 url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff') format('woff'),
-		 url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.otf') format('opentype'),
-		 url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.svg#MyriadPro-Cond') format('svg');
+	src: local("Myriad Pro Condensed"), /* чтобы сработало надо в Windows установить MyriadPro-Cond.ttf */
+	local("MyriadPro-Cond"), /* чтобы сработало надо в Windows установить MyriadPro-Cond.ttf */
+	/* если данный стиль загружается из CDN, то и шрифты оттуда же */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff2') format('woff2'), /* Супер новые браузеры */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.woff') format('woff'), /* Новые браузеры */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.ttf') format('truetype'), /* Safari, Android, iOS */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.otf') format('opentype'), /**/
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot'), /* IE9 Compat Modes */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
+	url('../../../_content/MSU.View.Otk/fonts/MyriadPro-Cond.svg#MyriadPro-Cond') format('svg'); /* Legacy iOS */
 }
 
 body {
 	min-height: 100%;
 	/*  margin: 0px 1%;*/
-	background: #000 url("../../../_content/MSU.View.Otk/img/stars.gif") repeat fixed 0% 0%;
+	background: #000 url("../../../_content/MSU.View.Otk/img/stars.gif") repeat fixed 0% 0%; /* var(--body-background) */
 	color: #e8e8e8 /*#FFFFFF*/; /*цвет текста на сайте*/
 	font-family: 'MyriadProCondensed', sans-serif;
 	font-weight: 400;
@@ -250,8 +250,8 @@ td{
 	position: relative;
 	height: auto; /*резиновая высота*/
 	width: auto;
-    background: transparent url("../../../_content/MSU.View.Otk/img/header.jpg") no-repeat scroll left top; /*картинка-фон слева*/
-    border-left: 3px solid #69C;
+	background: transparent url("../../../_content/MSU.View.Otk/img/header.jpg") no-repeat scroll left top; /*картинка-фон слева   var(--header-background) */
+	border-left: 3px solid #69C;
 	border-bottom: 2px solid #69C;
 }
 /*Название сайта на картинке "Благая весть"*/
