@@ -119,7 +119,7 @@ window.getImgData = function (imgEl) {
 }
 
 function openImg(imgEl) {
-    if (location.hostname === "") { // это для автономного режима
+    if (/*location.hostname === ""*/isAutonomy()) { // это для автономного и статического режима
         var dataImg = imgEl.getAttribute("src"); //imgEl.src;// document.getElementById(id).src;
         var imgElement = "<img width='100%' src='" + dataImg + "' />";
         var win = window.open();
