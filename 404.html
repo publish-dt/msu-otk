@@ -1,10 +1,15 @@
+<script type="text/javascript" src="https://publish-dt.github.io/msu-otk/conf.js"></script>
 <script type="text/javascript">
-  var url = 'https://2.56.88.201' + window.location.pathname;
-  window.location = url;
-  //window.location.replace(url);
-  //window.location.href = url;
-  //window.location.assign(url);
-  //window.open(url,"_self","","");
-  //window.top.location.href=url; 
+  window.onload = function () {
+    let pathname = window.location.pathname;
+    if(pathname.startsWith(basePath)) pathname = pathname.substring(0, pathname.indexOf(basePath));
+    var url = hostname + pathname;
+    window.location = url;
+    //window.location.replace(url);
+    //window.location.href = url;
+    //window.location.assign(url);
+    //window.open(url,"_self","","");
+    //window.top.location.href=url; 
+  }  
 </script>
-<p>test 1</p>
+
