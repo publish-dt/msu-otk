@@ -127,7 +127,7 @@ function openImg(imgEl) {
 }
 
 document.body.addEventListener('htmx:configRequest', function (evt) {
-    if (true || location.hostname === "" || (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true)) { // это для автономного режима или если при предыдущей попытке не найден
+    if (location.hostname === "" || (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true)) { // это для автономного режима или если при предыдущей попытке не найден
         evt.detail.headers['MSU-Dev'] = prefix;
         evt.detail.path = hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path;
 
