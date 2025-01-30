@@ -3,7 +3,7 @@
   window.onload = function () {
     debugger;
     let pathname = window.location.pathname;
-    if(pathname.startsWith(basePath)) pathname = pathname.substring(0, pathname.indexOf(basePath));
+    if(pathname.startsWith(basePath)) pathname = pathname.substring(0, basePath.length);
     var url = hostname + pathname;
     window.location = url;
     //window.location.replace(url);
