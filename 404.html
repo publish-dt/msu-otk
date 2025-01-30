@@ -2,11 +2,13 @@
 <script type="text/javascript">
   window.onload = function () {
     debugger;
+    let backHref = window.location.href;
     let pathname = window.location.pathname;
     if(pathname.startsWith(basePath)) pathname = pathname.substring(basePath.length-1);
     var url = hostname + pathname;
     window.location = url;
-    //window.location.replace(url);
+    
+    window.location.replace(backHref);
     //window.location.href = url;
     //window.location.assign(url);
     //window.open(url,"_self","","");
