@@ -112,7 +112,7 @@ function imgSetSrc() {
 
 // для автономного режима получаем путь/байты изображения из БД
 window.getImgData = function (imgEl) {
-    if (isAutonomy()) { // это для автономного или статического режима
+    if (location.hostname === ""/*isAutonomy()*/) { // это для автономного режима (по идее для статического это не нужно, т.к. должно загружаться через скрипт в 404.html)
         imgEl.src = hostname + imgEl.getAttribute("src");
     }
 }
