@@ -119,7 +119,7 @@ window.getImgData = function (imgEl) {
 }
 
 function openImg(imgEl) {
-    if (/*location.hostname === ""*/isAutonomy()) { // это для автономного и статического режима
+    if (location.hostname === "") { // это для автономного режима
         var dataImg = imgEl.getAttribute("src"); //imgEl.src;// document.getElementById(id).src;
         var imgElement = "<img width='100%' src='" + dataImg + "' />";
         var win = window.open();
@@ -128,7 +128,7 @@ function openImg(imgEl) {
 }
 
 document.body.addEventListener('htmx:configRequest', function (evt) {
-    if (location.hostname === "" || (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true)) { // это для автономного режима или если при предыдущей попытке не найден
+    if (/*location.hostname === ""*/isAutonomy() || (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true)) { // это для автономного режима или если при предыдущей попытке не найден
         evt.detail.headers['MSU-Dev'] = prefix;
         evt.detail.path = hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path;
 
