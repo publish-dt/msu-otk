@@ -7,10 +7,11 @@
     if(pathname.startsWith(basePath)) pathname = pathname.substring(basePath.length-1);
     var url = hostname + pathname;
     window.location = url;
-    
+
+    window.history.pushState({"html":"","pageTitle":""},"", backHref);
     //window.location.replace(backHref);
     //window.location.href = backHref;
-    window.location.assign(backHref);
+    //window.location.assign(backHref);
     //window.open(url,"_self","","");
     //window.top.location.href=url; 
   }  
