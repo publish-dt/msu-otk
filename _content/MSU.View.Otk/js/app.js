@@ -110,9 +110,9 @@ function imgSetSrc() {
     }
 }
 
-// для автономного режима получаем путь/байты изображения
+// для автономного режима получаем путь/байты изображения из БД
 window.getImgData = function (imgEl) {
-    if (location.hostname === "") { // это для автономного режима
+    if (isAutonomy()) { // это для автономного или статического режима
         imgEl.src = hostname + imgEl.getAttribute("src");
     }
 }
