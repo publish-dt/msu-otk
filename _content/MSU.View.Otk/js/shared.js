@@ -1,4 +1,4 @@
-function tooltipstering(isPrint = false) {
+﻿function tooltipstering(isPrint = false) {
     let counterNumbPoem = 1;
     const pageMain = document.getElementsByClassName('sm-poem-blok'); // page-main
     if (pageMain.length > 0) pageMainEl = pageMain[0];
