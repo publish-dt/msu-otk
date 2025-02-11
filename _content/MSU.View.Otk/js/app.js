@@ -154,9 +154,27 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
 // событие: произошла ошибка при запросе через htmx (например, не найдена страница)
 document.body.addEventListener('htmx:responseError', function (evt) {
-    if (location.hostname !== "" && evt.detail.xhr.status === 404) { // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
+    if (isAutonomy() && evt.detail.xhr.status === 404) { // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
         reCallRequest(evt);
     }
+});
+
+// событие: перед заменой таргета полученными в результате запроса данными
+document.body.addEventListener('htmx:beforeSwap', function (evt) {
+    if (evt.detail.xhr.status === 404) {
+        //alert("Error: Could Not Find Resource");
+        evt.detail.shouldSwap = true;
+        evt.detail.isError = false;
+        //evt.detail.target = htmx.find("#teapot");
+    }
+    else if (evt.detail.xhr.status === 500) {
+        alert("Произошла ошибка на сервере! Попробуйте позже.");
+    }
+
+    let menu = document.getElementById('bs-navbar');
+    if(menu.classList.contains('in') === true)
+        menu.classList.toggle('in');
+
 });
 
 function reCallRequest(evt) {
