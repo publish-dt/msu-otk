@@ -1,25 +1,31 @@
-﻿let domain = "";
-let hostname = "";
-let isStaticMode = false;
-let isAlert = false;
-let dnsLinks = "dnslink.msu.work.gd";
+﻿domain = ""; // let удалено, т.к. ошибка возникает, когда через историю браузера возвращаемся назад
+hostname = "";
+isStaticMode = false;
+isAlert = false;
+dnsLinks = "dnslink.msu.work.gd";
 
-let prefix = "";
-let StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // надо дополнительно получать этот хост через ajax, т.к. этот CDN может быть недоступен и приложение будет не работоспособно.
-let cachePathFile = "_cnt";
+prefix = "";
+StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // надо дополнительно получать этот хост через ajax, т.к. этот CDN может быть недоступен и приложение будет не работоспособно.
+cachePathFile = "_cnt";
 
-let originalHostname = hostname; // запоминаем изначальный хост, чтобы потом к нему вернуться, после смены на дополнительный хост, когда текущий недоступен
-let newHosts = {}; // список новых/дополнительных хостов, т.к. текущий недоступен
-let isNewHost = false; // установлен новый хост, т.к. текущий недоступен
+originalHostname = hostname; // запоминаем изначальный хост, чтобы потом к нему вернуться, после смены на дополнительный хост, когда текущий недоступен
+newHosts = {}; // список новых/дополнительных хостов, т.к. текущий недоступен
+isNewHost = false; // установлен новый хост, т.к. текущий недоступен
+
+
+
+/*window.onerror = function (message, url, line, col, error) {
+    if (isAlert) alert(message + "\n В " + line + ":" + col + " на " + url);
+};*/
 
 
 /*document.querySelector('.header').style.setProperty("--header-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/header.jpg')");
 document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/stars.gif')");*/
 
 
-window.onload = async function () {
+window.onload = /*async*/ function () {
 
-    await getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
+    /*await*/ getAddressFromDNS(); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
     onLoadMain();
 
@@ -52,15 +58,16 @@ function hiddenTooltip(el) {
 function clearTooltip() {
 
     let listTimeoutID = [];
-    document.querySelectorAll('.hint--left').forEach(box =>
-        box.addEventListener('mouseenter', function (event) {
+    Array.prototype.slice.call(document.querySelectorAll('.hint--left')).forEach(function (box) {
+        return box.addEventListener('mouseenter', function (event) {
             event.target.style.setProperty("--visibility", "visible");
             timeoutID = window.setTimeout(hiddenTooltip, 1500, event.target);
             listTimeoutID.push([event.target, timeoutID]);
-        })
+        });
+        }
     );
-    document.querySelectorAll('.hint--left').forEach(box =>
-        box.addEventListener('mouseleave', function (event) {
+    Array.prototype.slice.call(document.querySelectorAll('.hint--left')).forEach(function (box) {
+        return box.addEventListener('mouseleave', function (event) {
             for (let i = 0; i < listTimeoutID.length; i++) {
                 if (listTimeoutID[i][0] === event.target) {
                     window.clearTimeout(listTimeoutID[i][1]);
@@ -69,7 +76,8 @@ function clearTooltip() {
                     //hiddenTooltip(event.target);
                 }
             }
-        })
+        });
+        }
     );
 
 }
@@ -161,8 +169,7 @@ document.body.addEventListener('htmx:responseError', function (evt) {
 
 // событие: перед заменой таргета полученными в результате запроса данными
 document.body.addEventListener('htmx:beforeSwap', function (evt) {
-    if (evt.detail.xhr.status === 404) {
-        //alert("Error: Could Not Find Resource");
+    if (evt.detail.xhr.status === 404) { // это, ВРОДЕ, для того, чтобы не зацикливалось
         evt.detail.shouldSwap = true;
         evt.detail.isError = false;
         //evt.detail.target = htmx.find("#teapot");
@@ -178,26 +185,15 @@ document.body.addEventListener('htmx:beforeSwap', function (evt) {
 });
 
 function reCallRequest(evt) {
-    // если триггера нет (как, например, у тега <a>), то это не значит, что это всегда тег <a>, так, напримерм, у <body> иногда есть триггер, а иногда нет, поэтому не стоит использовать здесь триггер.
-    // а если есть, например, "load", то его повторно вызвать всё равно не получится.
-    /*let trigger = evt.detail.elt.getAttribute('hx-trigger');
-    if (trigger !== null) {
-        if (trigger.indexOf('load') === 0) trigger = "load";
-        //trigger = "click";
-        htmx.trigger(evt.detail.elt, trigger, { notfound: true });
-    }
-    else*/ {
-        //var base = document.getElementsByTagName('base')[0].getAttribute("href");
-        var url = new URL(evt.detail.pathInfo.requestPath, hostname);
-        htmx.ajax('GET', /*hostname + /*(evt.detail.pathInfo.requestPath.indexOf('/') === 0 ? "" : "/") + evt.detail.pathInfo.requestPath*/url.pathname, { target: '#main-cont'/*, swap: 'outerHTML'*/ }); // https://v1.htmx.org/api/#ajax
-    }
+    var url = new URL(evt.detail.pathInfo.requestPath, hostname);
+    htmx.ajax('GET', /*hostname + /*(evt.detail.pathInfo.requestPath.indexOf('/') === 0 ? "" : "/") + evt.detail.pathInfo.requestPath*/url.pathname, { target: '#main-cont'/*, swap: 'outerHTML'*/ }); // https://v1.htmx.org/api/#ajax
 }
 
 // событие: произошла ошибка при запросе через htmx (например, недоступен сервер)
-document.body.addEventListener('htmx:sendError', async function (evt) {
+document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
     let firstTime = false;
 
-    let urls = await getAddressFromDNS();
+    let urls = /*await*/ getAddressFromDNS();
     if (urls !== undefined && urls.length > 0) {
 
         if (isNewHost === false) firstTime = true;
@@ -222,7 +218,7 @@ document.body.addEventListener('htmx:sendError', async function (evt) {
 
         // через 30 мин., после первого изменения хоста, сбрасываем это новое значение и возвращаемся к исходному
         if (firstTime === true && isNewHost === true) {
-            setTimeout(() => {
+            setTimeout(function () {
 
                 returnOriginalHostname();
 
@@ -247,39 +243,59 @@ function returnOriginalHostname() {
 }
 
 // получаем хост/url из DNS-записи
-async function getAddressFromDNS(isOriginDnsLink = false) {
-    if (dnsLinks !== "") {
-        let response = await fetch("https://dns.google/resolve?name=" + dnsLinks + "&type=TXT");
+/*async*/ function getAddressFromDNS(isOriginDnsLink/* = false*/) {
+    if (isOriginDnsLink === undefined) isOriginDnsLink = false;
 
+    if (dnsLinks !== "") {
+        let xhr = new XMLHttpRequest();
+        xhr.open("GET", "https://dns.google/resolve?name=" + dnsLinks + "&type=TXT");
+        xhr.send();
+
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                const res = JSON.parse(xhr.response);
+                if (res.Answer !== undefined && res.Answer.length > 0) {
+                    let data = res.Answer[0].data;
+                    var terms = data.split(' ');
+
+                    let urls = [];
+                    //for (let item of terms) {
+                    for (let i = 0; i < terms.length; i++) {
+                        let item = terms[i];
+
+                        let kv = item.split('=');
+                        if (!isOriginDnsLink && (kv[0] === "dnslink" || (kv[0] === "origindnslink" && hostname !== kv[1]))) {
+                            let domainNew = kv[1];
+                            if (domainNew !== undefined && domainNew !== "") urls.push(domainNew);
+                        }
+
+                        if (isOriginDnsLink && kv[0] === "origindnslink") {
+                            let domainNew = kv[1];
+                            if (domainNew !== undefined && domainNew !== "") {
+                                hostname = domainNew;
+                                originalHostname = domainNew;
+                            }
+                        }
+
+                    };
+
+                    return urls;
+                }
+            }
+            else {
+                if (isAlert) alert("Ошибка при получении доменов: " + xhr.status);
+            }
+        };
+
+        xhr.onerror = function () { // происходит, только когда запрос совсем не получилось выполнить
+            if (isAlert) alert("Ошибка соединения");
+        };
+
+        /*let response = await fetch("https://dns.google/resolve?name=" + dnsLinks + "&type=TXT");
         if (response.ok) { // если HTTP-статус в диапазоне 200-299
             res = await response.json();
-            if (res.Answer !== undefined && res.Answer.length > 0) {
-                let data = res.Answer[0].data;
-                var terms = data.split(' ');
-
-                let urls = [];
-                for (let item of terms) {
-
-                    let kv = item.split('=');
-                    if (!isOriginDnsLink && (kv[0] === "dnslink" || (kv[0] === "origindnslink" && hostname !== kv[1]))) {
-                        let domain = kv[1];
-                        if (domain !== undefined && domain !== "") urls.push(domain);
-                    }
-
-                    if (isOriginDnsLink && kv[0] === "origindnslink") {
-                        let domain = kv[1];
-                        if (domain !== undefined && domain !== "") {
-                            hostname = domain;
-                            originalHostname = domain;
-                        }
-                    }
-
-                };
-
-                return urls;
-            }
         } else {
             if (isAlert) alert("Ошибка при получении доменов: " + response.status);
-        }
+        }*/
     }
 }
