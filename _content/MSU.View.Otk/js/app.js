@@ -9,9 +9,11 @@ StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // 
 cachePathFile = "_cnt";
 
 originalHostname = hostname; // запоминаем изначальный хост, чтобы потом к нему вернуться, после смены на дополнительный хост, когда текущий недоступен
-newHosts = {}; // список новых/дополнительных хостов, т.к. текущий недоступен
-isNewHost = false; // установлен новый хост, т.к. текущий недоступен
 
+let urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
+let newHosts = {}; // список новых/дополнительных хостов (т.к. текущий недоступен). Это не полный список, а только те, к которым уже был выполнен запрос, т.е уже знаем рабочий этот хост или недоступный
+let isNewHost = false; // установлен новый хост, т.к. текущий недоступен
+let numbMinutes = 30; // количество минут, по истечению которых будет сброшен список новых хостов (newHosts)
 
 
 /*window.onerror = function (message, url, line, col, error) {
@@ -23,9 +25,9 @@ isNewHost = false; // установлен новый хост, т.к. теку�
 document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/stars.gif')");*/
 
 
-window.onload = /*async*/ function () {
+window.onload = function () {
 
-    /*await*/ getAddressFromDNS(); // получаем первоначальный hostname (его может не быть) из DNS-записи
+    getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
     onLoadMain();
 
@@ -36,6 +38,7 @@ window.onload = /*async*/ function () {
     }
 
 }
+
 
 // самые первые действия сразу после загрузки всех ресурсов сайта
 function onLoadMain() {
@@ -80,6 +83,13 @@ function clearTooltip() {
         }
     );
 
+}
+
+function isLoadError() {
+    if (document.title === "Ошибка")
+        return true;
+
+    return false;
 }
 
 // проверка, является ли текущее приложение автономным или работает в статическом режиме, например, через GitHub Pages
@@ -128,10 +138,10 @@ function imgSetSrc() {
 
 // для автономного режима получаем путь/байты изображения из БД, когда через механизм браузера не удалось загрузить (не было найдено изображение по указанному пути)
 window.getImgData = function (imgEl) {
-    if (isAutonomy()) { // это для автономного и статического режима
+    //if (isAutonomy()) { // это для автономного и статического режима
         let src = imgEl.getAttribute("src");
         imgEl.src = hostname + (src.indexOf('/') === 0 ? "" : "/") + src;
-    }
+    //}
 }
 
 // срабатывает при клике по изображению в автономном режиме
@@ -152,9 +162,22 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     if (trigger !== null && trigger.indexOf('load') === 0) isFirstLoadRequest = true;
     else isFirstLoadRequest = false;*/
 
-    if (/*location.hostname === ""*/isAutonomy() || (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true)) { // это для автономного или статического режима или если при предыдущей попытке не найден
+    if (isAutonomy() ||  // это для автономного или статического режима
+        (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true) || // или если при предыдущей попытке не найден
+        isNewHost // или при предыдущей попытке был установлен новый хост, значит и последующие заприсы будем выполнять к этому новому хосту, пока он не сброситься 
+    ) {
         evt.detail.headers['MSU-Dev'] = prefix;
-        evt.detail.path = hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path;
+        let path = evt.detail.path;
+        if (!isAutonomy() && evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.type === "onGetDNS") { // evt.detail.headers["HX-Trigger"] === "main-cont"
+            if (path.indexOf('http') !== -1) return new URL(path);
+            if (evt.detail.headers["HX-Current-URL"] !== undefined) {
+                let hXCurrentURL = evt.detail.headers["HX-Current-URL"];
+                let url = new URL(hXCurrentURL);
+                path = url.pathname;
+            }
+        }
+        let url = getURL(path);
+        evt.detail.path = url.href;// hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path;
 
         if (isAlert) alert("hostname = "+hostname);
     }
@@ -162,8 +185,10 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
 // событие: произошла ошибка при запросе через htmx (например, не найдена страница)
 document.body.addEventListener('htmx:responseError', function (evt) {
-    if (isAutonomy() && evt.detail.xhr.status === 404) { // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
-        reCallRequest(evt);
+    if (isAutonomy() && evt.detail.xhr.status === 404 ||  // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
+        (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600)
+    ) {
+        callNewServer(evt); //reCallRequest(evt); // выполняем запрос к доп. хосту
     }
 });
 
@@ -174,8 +199,10 @@ document.body.addEventListener('htmx:beforeSwap', function (evt) {
         evt.detail.isError = false;
         //evt.detail.target = htmx.find("#teapot");
     }
-    else if (evt.detail.xhr.status === 500) {
-        alert("Произошла ошибка на сервере! Попробуйте позже.");
+    else if (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600) {
+        //alert("Произошла ошибка на сервере! Попробуйте позже.");
+        //getAddressFromDNS(false, evt, selNewServer);
+        let a = 1;
     }
 
     let menu = document.getElementById('bs-navbar');
@@ -184,35 +211,58 @@ document.body.addEventListener('htmx:beforeSwap', function (evt) {
 
 });
 
+// дополнительные запросы всегда выполняются не к домену по умолчанию (т.е. на котором открыт сайт), а к доп. хостам (для автономного режима всегда есть доп. хосты)
 function reCallRequest(evt) {
-    var url = new URL(evt.detail.pathInfo.requestPath, hostname);
-    htmx.ajax('GET', /*hostname + /*(evt.detail.pathInfo.requestPath.indexOf('/') === 0 ? "" : "/") + evt.detail.pathInfo.requestPath*/url.pathname, { target: '#main-cont'/*, swap: 'outerHTML'*/ }); // https://v1.htmx.org/api/#ajax
+    if (hostname !== "") {
+        //var url = new URL(evt.detail.pathInfo.requestPath, evt.detail.pathInfo.requestPath.indexOf('http') !== -1 ? '' : hostname);
+        let url = getURL(evt.detail.pathInfo.requestPath, hostname);
+        htmx.ajax('GET', url.href/*pathname*/, { target: '#main-cont'/*, swap: 'outerHTML'*/ }).then(
+            function (result) {
+                /* обработает успешное выполнение */
+                let a = 1;
+            },
+            function (error) {
+                /* обработает ошибку */
+                let a = 2;
+            }
+        ); // https://v1.htmx.org/api/#ajax
+    }
 }
 
 // событие: произошла ошибка при запросе через htmx (например, недоступен сервер)
 document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
+    callNewServer(evt);
+});
+
+function callNewServer(evt) {
     let firstTime = false;
 
-    let urls = /*await*/ getAddressFromDNS();
+    //let urls = /*await*/ getAddressFromDNS(); // это выполняется через callback
     if (urls !== undefined && urls.length > 0) {
 
         if (isNewHost === false) firstTime = true;
 
         isNewHost = false;
         for (var i = 0; i < urls.length; i++) {
-            if (newHosts[urls[i]] === undefined) {
+            
+            if (newHosts[urls[i]] === undefined &&
+                urls[i] !== location.origin &&  // нам не надо использовать хост, который совпадает с хостом из адресной строки браузера
+                (location.protocol !== "https:" ||
+                    (location.protocol === "https:" && urls[i].indexOf('http:') === -1) // http нельзя вызывать из https, по правилам безопасности
+                )
+            ) {
 
                 newHosts[urls[i]] = true;
                 hostname = urls[i];
                 if (isAlert) console.log("Новый хост: " + hostname);
                 isNewHost = true;
 
-                reCallRequest(evt);
+                if (evt !== undefined) reCallRequest(evt);
 
                 break;
             }
             else if (newHosts[urls[i]] === true) {
-                newHosts[urls[i]] = false;
+                newHosts[urls[i]] = false; // отключаем ранее использованный хост
             }
         }
 
@@ -224,18 +274,17 @@ document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
 
                 isNewHost = false;
 
-            }, 60000 * 30);
+            }, 60000 * numbMinutes);
         }
 
         if (isNewHost == false) {
             returnOriginalHostname();
 
-            alert("Все сервера недоступны! Попробуйте снова, через некоторое время.")
+            alert("Все сервера недоступны! Попробуйте снова, через некоторое время.");
         }
     }
-    else alert("Сервер недоступен! Попробуйте снова, через некоторое время.")
-});
-
+    else alert("Сервер недоступен! Попробуйте снова, через некоторое время.");
+}
 function returnOriginalHostname() {
     hostname = originalHostname;
     newHosts = {};
@@ -243,7 +292,7 @@ function returnOriginalHostname() {
 }
 
 // получаем хост/url из DNS-записи
-/*async*/ function getAddressFromDNS(isOriginDnsLink/* = false*/) {
+function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
     if (isOriginDnsLink === undefined) isOriginDnsLink = false;
 
     if (dnsLinks !== "") {
@@ -255,16 +304,48 @@ function returnOriginalHostname() {
             if (xhr.status === 200) {
                 const res = JSON.parse(xhr.response);
                 if (res.Answer !== undefined && res.Answer.length > 0) {
-                    let data = res.Answer[0].data;
-                    var terms = data.split(' ');
+                    const data = res.Answer[0].data;
+                    dataStr = data.replaceAll("'", '"');
+                    try {
+                        const dataObj = JSON.parse(dataStr);
+                        const siteConf = dataObj.Sites[siteID];
 
-                    let urls = [];
+                        if (siteConf !== undefined) {
+                            if (siteConf.dnsLinks !== undefined) urls = siteConf.dnsLinks;
+
+                            if (isOriginDnsLink &&
+                                siteConf.originDnsLink !== undefined && siteConf.originDnsLink !== ''
+                            )
+                                originalHostname = siteConf.originDnsLink;
+
+                            if (siteConf.minutes !== undefined) numbMinutes = siteConf.minutes;
+                        }
+                    } catch (e) {
+                        console.error("Ошибка при разборе json-данных из DNS TXT-записи", e.message);
+                        if (isAlert) alert("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка: " + e.message);
+                    }
+
+
+                    // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие onGetDNS (используется в hx-trigger)
+                    if (urls.length > 0 && isLoadError() || isAutonomy()) {
+                        callNewServer();
+
+                        const eventVal = new CustomEvent("onGetDNS", { detail: true });
+                        document.getElementById('main-cont').dispatchEvent(eventVal);
+                    }
+                    //return urls;
+                    //if (callback !== undefined) callback(urls, evt);
+
+
+                    /*var terms = data.split(' ');
+
+                    urls = [];
                     //for (let item of terms) {
                     for (let i = 0; i < terms.length; i++) {
                         let item = terms[i];
 
                         let kv = item.split('=');
-                        if (!isOriginDnsLink && (kv[0] === "dnslink" || (kv[0] === "origindnslink" && hostname !== kv[1]))) {
+                        if ((kv[0] === "dnslink" || (kv[0] === "origindnslink" && hostname !== kv[1]))) {
                             let domainNew = kv[1];
                             if (domainNew !== undefined && domainNew !== "") urls.push(domainNew);
                         }
@@ -272,14 +353,15 @@ function returnOriginalHostname() {
                         if (isOriginDnsLink && kv[0] === "origindnslink") {
                             let domainNew = kv[1];
                             if (domainNew !== undefined && domainNew !== "") {
-                                hostname = domainNew;
+                                //hostname = domainNew;
                                 originalHostname = domainNew;
                             }
                         }
 
-                    };
-
-                    return urls;
+                        if (kv[0] === "minutes") {
+                            numbMinutes = Number(kv[1]);
+                        }
+                    };*/
                 }
             }
             else {
@@ -299,3 +381,40 @@ function returnOriginalHostname() {
         }*/
     }
 }
+
+function getURL(path, newHostname) {
+    let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (hostname === "" ? location.origin : hostname));
+
+    if (baseUrl === '') return new URL(path); //baseUrl = undefined;
+    else {
+        if (path.indexOf('http') === -1) return new URL(path, baseUrl);
+
+        let url = new URL(path);
+        return new URL(url.pathname, baseUrl);
+    }
+}
+
+function loadScript(src, callback) {
+    let script = document.createElement('script');
+    script.src = src;
+    script.onload = function () { callback(script); };
+    document.head.append(script);
+}
+
+
+
+
+// Create the event.
+const event = document.createEvent("Event");
+
+// Define that the event name is 'build'.
+event.initEvent("onGetDNS");
+
+// Listen for the event.
+/*document.getElementById('main-cont').addEventListener(
+    "onGetDNS",
+    function (e) {
+        debugger;
+    },
+    false,
+);*/
