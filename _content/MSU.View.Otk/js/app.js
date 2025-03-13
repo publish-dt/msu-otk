@@ -1,8 +1,10 @@
-﻿domain = ""; // let удалено, т.к. ошибка возникает, когда через историю браузера возвращаемся назад
+// let удалено (у тех, которые ещё раз присваиваются (в файле conf.js)), т.к. ошибка возникает, когда через историю браузера возвращаемся назад
+domain = "";
 hostname = "";
 isStaticMode = false;
 isAlert = false;
-dnsLinks = "dnslink.msu.work.gd";
+dnsLinks = "dnslink.msu.linkpc.net";
+sendExtSPA = true; // подменять, для htmx, расширение отправляемого запроса на .spa
 
 prefix = "";
 StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // надо дополнительно получать этот хост через ajax, т.к. этот CDN может быть недоступен и приложение будет не работоспособно.
@@ -162,24 +164,43 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     if (trigger !== null && trigger.indexOf('load') === 0) isFirstLoadRequest = true;
     else isFirstLoadRequest = false;*/
 
+    let detail = evt.detail;
+    let path = detail.path;
+
     if (isAutonomy() ||  // это для автономного или статического режима
         (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true) || // или если при предыдущей попытке не найден
         isNewHost // или при предыдущей попытке был установлен новый хост, значит и последующие заприсы будем выполнять к этому новому хосту, пока он не сброситься 
     ) {
-        evt.detail.headers['MSU-Dev'] = prefix;
-        let path = evt.detail.path;
-        if (!isAutonomy() && evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.type === "onGetDNS") { // evt.detail.headers["HX-Trigger"] === "main-cont"
-            if (path.indexOf('http') !== -1) return new URL(path);
-            if (evt.detail.headers["HX-Current-URL"] !== undefined) {
-                let hXCurrentURL = evt.detail.headers["HX-Current-URL"];
+        /*// это нужно только только для IE11, когда срабатывает событие "on-get-dns"
+        if (typeof window.CustomEvent === "function" &&
+            (navigator.userAgent.indexOf('MSIE') !== -1 || navigator.appVersion.indexOf('Trident/') > -1)) {
+            detail = evt.detail.detail;
+        }*/
+
+        detail.headers['MSU-Dev'] = prefix;
+        path = detail.path;
+        if (!isAutonomy() && detail.triggeringEvent !== undefined && detail.triggeringEvent.type === "on-get-dns") { // detail.headers["HX-Trigger"] === "main-cont"
+            //if (path.indexOf('http') !== -1) return new URL(path);
+            if (detail.headers["HX-Current-URL"] !== undefined) {
+                let hXCurrentURL = detail.headers["HX-Current-URL"];
                 let url = new URL(hXCurrentURL);
                 path = url.pathname;
             }
         }
-        let url = getURL(path);
-        evt.detail.path = url.href;// hostname + (evt.detail.path.indexOf('/') === 0 ? "" : "/") + evt.detail.path;
+    }
 
-        if (isAlert) alert("hostname = "+hostname);
+    let url = getURL(path);
+    detail.path = sendExtSPA ? (detail.path.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href;
+
+    if (isAlert) alert("hostname = "+hostname);
+});
+
+document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
+    if (evt.detail.elt.localName == 'a') {
+        const url = new URL(evt.detail.elt.href);
+
+        evt.detail.pathInfo.responsePath = url.pathname;
+        evt.detail.requestConfig.path = url.pathname;
     }
 });
 
@@ -216,7 +237,8 @@ function reCallRequest(evt) {
     if (hostname !== "") {
         //var url = new URL(evt.detail.pathInfo.requestPath, evt.detail.pathInfo.requestPath.indexOf('http') !== -1 ? '' : hostname);
         let url = getURL(evt.detail.pathInfo.requestPath, hostname);
-        htmx.ajax('GET', url.href/*pathname*/, { target: '#main-cont'/*, swap: 'outerHTML'*/ }).then(
+        let path = sendExtSPA ? (url.href.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href;
+        htmx.ajax('GET', path/*pathname*/, { target: '#main-cont'/*, swap: 'outerHTML'*/ }).then(
             function (result) {
                 /* обработает успешное выполнение */
                 let a = 1;
@@ -305,7 +327,8 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
                 const res = JSON.parse(xhr.response);
                 if (res.Answer !== undefined && res.Answer.length > 0) {
                     const data = res.Answer[0].data;
-                    dataStr = data.replaceAll("'", '"');
+                    const re = /'/gi;
+                    dataStr = data.replace(re, '"');
                     try {
                         const dataObj = JSON.parse(dataStr);
                         const siteConf = dataObj.Sites[siteID];
@@ -321,47 +344,19 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
                             if (siteConf.minutes !== undefined) numbMinutes = siteConf.minutes;
                         }
                     } catch (e) {
-                        console.error("Ошибка при разборе json-данных из DNS TXT-записи", e.message);
+                        console.error("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка:", e.message);
                         if (isAlert) alert("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка: " + e.message);
                     }
 
 
-                    // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие onGetDNS (используется в hx-trigger)
+                    // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие on-get-dns (используется в hx-trigger)
                     if (urls.length > 0 && isLoadError() || isAutonomy()) {
                         callNewServer();
 
-                        const eventVal = new CustomEvent("onGetDNS", { detail: true });
-                        document.getElementById('main-cont').dispatchEvent(eventVal);
+                        htmx.trigger(document.getElementById('main-cont'), "on-get-dns", { detail: true });
+                        /*const eventVal = new CustomEvent("on-get-dns", { detail: true });
+                        document.getElementById('main-cont').dispatchEvent(eventVal);*/
                     }
-                    //return urls;
-                    //if (callback !== undefined) callback(urls, evt);
-
-
-                    /*var terms = data.split(' ');
-
-                    urls = [];
-                    //for (let item of terms) {
-                    for (let i = 0; i < terms.length; i++) {
-                        let item = terms[i];
-
-                        let kv = item.split('=');
-                        if ((kv[0] === "dnslink" || (kv[0] === "origindnslink" && hostname !== kv[1]))) {
-                            let domainNew = kv[1];
-                            if (domainNew !== undefined && domainNew !== "") urls.push(domainNew);
-                        }
-
-                        if (isOriginDnsLink && kv[0] === "origindnslink") {
-                            let domainNew = kv[1];
-                            if (domainNew !== undefined && domainNew !== "") {
-                                //hostname = domainNew;
-                                originalHostname = domainNew;
-                            }
-                        }
-
-                        if (kv[0] === "minutes") {
-                            numbMinutes = Number(kv[1]);
-                        }
-                    };*/
                 }
             }
             else {
@@ -402,19 +397,88 @@ function loadScript(src, callback) {
 }
 
 
-
-
 // Create the event.
-const event = document.createEvent("Event");
-
+//const event = document.createEvent("Event");
 // Define that the event name is 'build'.
-event.initEvent("onGetDNS");
+//event.initEvent("on-get-dns");
 
 // Listen for the event.
 /*document.getElementById('main-cont').addEventListener(
-    "onGetDNS",
+    "on-get-dns",
     function (e) {
         debugger;
     },
     false,
 );*/
+
+
+if (navigator.userAgent.indexOf('MSIE') !== -1
+    || navigator.appVersion.indexOf('Trident/') > -1) {
+
+    /* Polyfill URL method IE 11 */
+    // ES5
+    if (typeof window.URL !== 'function') {
+        window.URL = function (url) {
+            var protocol = url.split('//')[0],
+                comps = url.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
+                host = comps[0],
+                search = comps[comps.length - 1].split('?')[1],
+                tmp = host.split(':'),
+                port = tmp[1],
+                hostname = tmp[0];
+
+            search = typeof search !== 'undefined' ? '?' + search : '';
+
+            var params = [];
+            if (search !== "") {
+                params = search
+                    .slice(1)
+                    .split('&')
+                    .map(function (p) { return p.split('='); })
+                    .reduce(function (p, c) {
+                        var parts = c.split('=', 2).map(function (param) { return decodeURIComponent(param); });
+                        if (parts.length == 0 || parts[0] != param) return (p instanceof Array) && !asArray ? null : p;
+                        return asArray ? p.concat(parts.concat(true)[1]) : parts.concat(true)[1];
+                    }, []);
+            }
+
+            return {
+                hash: url.indexOf('#') > -1 ? url.substring(url.indexOf('#')) : '',
+                protocol: protocol,
+                host: host,
+                hostname: hostname,
+                href: url,
+                pathname: '/' + comps.splice(1).map(function (o) { return /\?/.test(o) ? o.split('?')[0] : o; }).join('/'),
+                search: search,
+                origin: protocol + '//' + host,
+                port: typeof port !== 'undefined' ? port : '',
+                searchParams: {
+                    get: function (p) {
+                        return p in params ? params[p] : ''
+                    },
+                    getAll: function () { return params; }
+                }
+            };
+        }
+    }
+    /* Polyfill IE 11 end */
+
+
+    /*const event = document.createEvent("CustomEvent");
+    event.initCustomEvent("on-get-dns", true, false, undefined);
+
+    // Polyfill CustomEvent method IE 11 
+    (function () {
+        if (typeof window.CustomEvent === "function") return false;
+        function CustomEvent(event, params) {
+            //params = params || { bubbles: false, cancelable: false, detail: undefined };
+            var evt = document.createEvent('CustomEvent');
+            evt.initCustomEvent(event, true, false, params);
+            return evt;
+        }
+        CustomEvent.prototype = window.Event.prototype;
+        window.CustomEvent = CustomEvent;
+    })();*/
+
+}
+
