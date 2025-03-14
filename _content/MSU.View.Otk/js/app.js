@@ -16,7 +16,7 @@ let urls = []; // полный список доп. хостов, получен
 let newHosts = {}; // список новых/дополнительных хостов (т.к. текущий недоступен). Это не полный список, а только те, к которым уже был выполнен запрос, т.е уже знаем рабочий этот хост или недоступный
 let isNewHost = false; // установлен новый хост, т.к. текущий недоступен
 let numbMinutes = 30; // количество минут, по истечению которых будет сброшен список новых хостов (newHosts)
-
+let numbTryLoadImg = {}; // попытки загрузок изображений при ошибке их загрузке
 
 /*window.onerror = function (message, url, line, col, error) {
     if (isAlert) alert(message + "\n В " + line + ":" + col + " на " + url);
@@ -138,12 +138,22 @@ function imgSetSrc() {
     }
 }
 
-// для автономного режима получаем путь/байты изображения из БД, когда через механизм браузера не удалось загрузить (не было найдено изображение по указанному пути)
+// если сменился хост, то и изображения загружаем с нового хоста (т.к. старый недоступен, а значит будет ошибка загрузки, которая сюда приведёт),
+// а так же это для автономного режима получаем путь / байты изображения из БД, когда через механизм браузера не удалось загрузить(не было найдено изображение по указанному пути)
 window.getImgData = function (imgEl) {
-    //if (isAutonomy()) { // это для автономного и статического режима
-        let src = imgEl.getAttribute("src");
-        imgEl.src = hostname + (src.indexOf('/') === 0 ? "" : "/") + src;
-    //}
+    if (isAutonomy() || hostname !== "") { // это для автономного и статического режима
+        const src = imgEl.getAttribute("src");
+        const srcFull = hostname + (src.indexOf('/') === 0 ? "" : "/") + src;
+
+        // ведём учёт попыток неудавшихся загрузок изображений. Только одна повторная попытка с того же хоста. (это нужно, чтобы не зацикливалась попытка загрузки изображений с одного и того же хоста)
+        if (numbTryLoadImg[srcFull] === undefined) {
+            numbTryLoadImg[srcFull] = true;
+            imgEl.src = srcFull;
+        }
+        else {
+            delete numbTryLoadImg[srcFull]; // удаляем использованную попытку загрузки конкретного изображения
+        }
+    }
 }
 
 // срабатывает при клике по изображению в автономном режиме
@@ -155,6 +165,7 @@ function openImg(imgEl) {
         win.document.write(imgElement);
     }
 }
+
 
 // это для автономного или статического режима (ссылка на статическом сайте никогда не ищется при работе через htmx)
 document.body.addEventListener('htmx:configRequest', function (evt) {
@@ -195,6 +206,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     if (isAlert) alert("hostname = "+hostname);
 });
 
+// это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
 document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
     if (evt.detail.elt.localName == 'a') {
         const url = new URL(evt.detail.elt.href);
@@ -267,7 +279,7 @@ function callNewServer(evt) {
         isNewHost = false;
         for (var i = 0; i < urls.length; i++) {
             
-            if (newHosts[urls[i]] === undefined &&
+            if (newHosts[urls[i]] === undefined && // этот хост мы ещё не использовали
                 urls[i] !== location.origin &&  // нам не надо использовать хост, который совпадает с хостом из адресной строки браузера
                 (location.protocol !== "https:" ||
                     (location.protocol === "https:" && urls[i].indexOf('http:') === -1) // http нельзя вызывать из https, по правилам безопасности
