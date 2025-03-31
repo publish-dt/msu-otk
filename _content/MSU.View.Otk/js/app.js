@@ -12,11 +12,15 @@ cachePathFile = "_cnt";
 
 originalHostname = hostname; // запоминаем изначальный хост, чтобы потом к нему вернуться, после смены на дополнительный хост, когда текущий недоступен
 
+let isQuoteRequestVal = false;
+let isExtRequestVal = true;
+
 let urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
 let newHosts = {}; // список новых/дополнительных хостов (т.к. текущий недоступен). Это не полный список, а только те, к которым уже был выполнен запрос, т.е уже знаем рабочий этот хост или недоступный
 let isNewHost = false; // установлен новый хост, т.к. текущий недоступен
 let numbMinutes = 30; // количество минут, по истечению которых будет сброшен список новых хостов (newHosts)
 let numbTryLoadImg = {}; // попытки загрузок изображений при ошибке их загрузке
+let isIE = false;
 
 /*window.onerror = function (message, url, line, col, error) {
     if (isAlert) alert(message + "\n В " + line + ":" + col + " на " + url);
@@ -38,7 +42,8 @@ window.onload = function () {
         tooltipstering();
         clearTooltip(); // управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
     }
-
+    //debugger;
+    //if (isIE) startReplaceDataStream(); // это не правильно здесь использовать, т.к. onload срабатывает только после полной/окончательной загрузки всех данных, а у нас загружаться может в несколько этапов поток
 }
 
 
@@ -171,26 +176,28 @@ function openImg(imgEl) {
 document.body.addEventListener('htmx:configRequest', function (evt) {
     // здесь использовать await нельзя!
 
-    /*это всё не работает let trigger = evt.detail.elt.getAttribute('hx-trigger');
-    if (trigger !== null && trigger.indexOf('load') === 0) isFirstLoadRequest = true;
-    else isFirstLoadRequest = false;*/
+    //это всё не работает let trigger = evt.detail.elt.getAttribute('hx-trigger');
+    //if (trigger !== null && trigger.indexOf('load') === 0) isFirstLoadRequest = true;
+    //else isFirstLoadRequest = false;
 
     let detail = evt.detail;
+    if (detail.headers["HX-Trigger"] !== undefined && detail.headers["HX-Trigger"] !== null && detail.headers["HX-Trigger"].indexOf('msu-') !== 0) return; // для всех триггеров, которые не начинаются с msu- не выполняем нижележащий код, например, для триггера "quote-block". Т.к. иначе подставляются к запросу .spa
+
     let path = detail.path;
 
     if (isAutonomy() ||  // это для автономного или статического режима
         (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true) || // или если при предыдущей попытке не найден
         isNewHost // или при предыдущей попытке был установлен новый хост, значит и последующие заприсы будем выполнять к этому новому хосту, пока он не сброситься 
     ) {
-        /*// это нужно только только для IE11, когда срабатывает событие "on-get-dns"
-        if (typeof window.CustomEvent === "function" &&
-            (navigator.userAgent.indexOf('MSIE') !== -1 || navigator.appVersion.indexOf('Trident/') > -1)) {
-            detail = evt.detail.detail;
-        }*/
+        //// это нужно только только для IE11, когда срабатывает событие "msu-on-get-dns"
+        //if (typeof window.CustomEvent === "function" &&
+        //    (navigator.userAgent.indexOf('MSIE') !== -1 || navigator.appVersion.indexOf('Trident/') > -1)) {
+        //    detail = evt.detail.detail;
+        //}
 
         detail.headers['MSU-Dev'] = prefix;
         path = detail.path;
-        if (!isAutonomy() && detail.triggeringEvent !== undefined && detail.triggeringEvent.type === "on-get-dns") { // detail.headers["HX-Trigger"] === "main-cont"
+        if (!isAutonomy() && detail.triggeringEvent !== undefined && detail.triggeringEvent.type === "msu-on-get-dns") { // detail.headers["HX-Trigger"] === "main-cont"
             //if (path.indexOf('http') !== -1) return new URL(path);
             if (detail.headers["HX-Current-URL"] !== undefined) {
                 let hXCurrentURL = detail.headers["HX-Current-URL"];
@@ -201,28 +208,34 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     }
 
     let url = getURL(path);
-    detail.path = sendExtSPA ? (detail.path.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href;
+    detail.path = (sendExtSPA && detail.boosted && detail.path.indexOf('.spa') === -1) ? (detail.path.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
+
+    // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
+    if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
+        if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
+        else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
 
     if (isAlert) alert("hostname = "+hostname);
 });
 
-// это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
-document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
-    if (evt.detail.elt.localName == 'a') {
-        const url = new URL(evt.detail.elt.href);
 
-        evt.detail.pathInfo.responsePath = url.pathname;
-        evt.detail.requestConfig.path = url.pathname;
-    }
+document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
+    returnOriginalExtension(evt); // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
 });
 
-// событие: произошла ошибка при запросе через htmx (например, не найдена страница)
+// событие: произошла ошибка при запросе через htmx (например, не найдена страница или ошибка 500)
 document.body.addEventListener('htmx:responseError', function (evt) {
     if (isAutonomy() && evt.detail.xhr.status === 404 ||  // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
         (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600)
     ) {
-        callNewServer(evt); //reCallRequest(evt); // выполняем запрос к доп. хосту
+        if (evt.detail.boosted) callNewServer(evt); // выполняем повторный запрос к доп. хосту (только для запроса основного контента (не для ext и пр.))
     }
+});
+
+// событие: произошла ошибка при запросе через htmx (например, недоступен сервер)
+document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
+    callNewServer(evt);
+    //returnOriginalExtension(evt);
 });
 
 // событие: перед заменой таргета полученными в результате запроса данными
@@ -242,14 +255,27 @@ document.body.addEventListener('htmx:beforeSwap', function (evt) {
     if(menu.classList.contains('in') === true)
         menu.classList.toggle('in');
 
+    if (evt.detail.boosted && evt.srcElement.offsetParent.firstChild && evt.srcElement.offsetParent.firstChild.getAttribute('id') === "quote-block")
+        evt.detail.target = htmx.find("#main-cont"); // т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится
+
 });
+
+// это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
+function returnOriginalExtension(evt) {
+    if (evt.detail.elt.localName == 'a') {
+        const url = new URL(evt.detail.elt.href);
+
+        evt.detail.pathInfo.responsePath = url.pathname;
+        evt.detail.requestConfig.path = url.pathname;
+    }
+}
 
 // дополнительные запросы всегда выполняются не к домену по умолчанию (т.е. на котором открыт сайт), а к доп. хостам (для автономного режима всегда есть доп. хосты)
 function reCallRequest(evt) {
     if (hostname !== "") {
         //var url = new URL(evt.detail.pathInfo.requestPath, evt.detail.pathInfo.requestPath.indexOf('http') !== -1 ? '' : hostname);
         let url = getURL(evt.detail.pathInfo.requestPath, hostname);
-        let path = sendExtSPA ? (url.href.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href;
+        let path = (sendExtSPA && evt.detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href;
         htmx.ajax('GET', path/*pathname*/, { target: '#main-cont'/*, swap: 'outerHTML'*/ }).then(
             function (result) {
                 /* обработает успешное выполнение */
@@ -262,11 +288,6 @@ function reCallRequest(evt) {
         ); // https://v1.htmx.org/api/#ajax
     }
 }
-
-// событие: произошла ошибка при запросе через htmx (например, недоступен сервер)
-document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
-    callNewServer(evt);
-});
 
 function callNewServer(evt) {
     let firstTime = false;
@@ -314,10 +335,13 @@ function callNewServer(evt) {
         if (isNewHost == false) {
             returnOriginalHostname();
 
-            alert("Все сервера недоступны! Попробуйте снова, через некоторое время.");
+            //if (evt.detail.target.getAttribute('id') === "main-cont")
+                alert("Все сервера недоступны! Попробуйте снова, через некоторое время.");
         }
     }
-    else alert("Сервер недоступен! Попробуйте снова, через некоторое время.");
+    else
+        if (evt.detail.boosted /*evt.detail.target.getAttribute('id') === "main-cont"*/)
+            alert("Сервер недоступен! Попробуйте снова, через некоторое время."); // это нужно отображать только для основного контента, а для ext и пр. не надо.
 }
 function returnOriginalHostname() {
     hostname = originalHostname;
@@ -361,12 +385,12 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
                     }
 
 
-                    // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие on-get-dns (используется в hx-trigger)
+                    // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие msu-on-get-dns (используется в hx-trigger)
                     if (urls.length > 0 && isLoadError() || isAutonomy()) {
                         callNewServer();
 
-                        htmx.trigger(document.getElementById('main-cont'), "on-get-dns", { detail: true });
-                        /*const eventVal = new CustomEvent("on-get-dns", { detail: true });
+                        htmx.trigger('#main-cont', "msu-on-get-dns", { detail: true });
+                        /*const eventVal = new CustomEvent("msu-on-get-dns", { detail: true });
                         document.getElementById('main-cont').dispatchEvent(eventVal);*/
                     }
                 }
@@ -401,6 +425,140 @@ function getURL(path, newHostname) {
     }
 }
 
+function isExtRequest() {
+    return isExtRequestVal;
+}
+function isQuoteRequest() {
+    return isQuoteRequestVal;
+}
+
+/* Плагин для HTMX - обработка JSON-данных, полученных с сервера */
+htmx.defineExtension('json-response', {
+    transformResponse: function (text, xhr, elt) {
+        //var mustacheTemplate = htmx.closest(elt, '[mustache-template]')
+        var apiName = elt.getAttribute('id')
+        //debugger
+        if (apiName === 'api-ext') {
+            var data = JSON.parse(text)
+            if (data) {
+                for (var i = 0; i < data.length; i++) {
+                    var targetElt = htmx.find(data[i].target)
+                    if (targetElt) {
+                        targetElt.innerHTML = data[i].content;
+
+                        // для БВ очищаем подпись-ссылку на Послание
+                        if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
+                            var signature = htmx.find("#signature");
+                            if (signature.parentNode) {
+                                signature.parentNode.removeChild(signature);
+                            }
+                            //signature.remove();
+                        }
+
+                        htmx.process("#quote-block"); // document.body
+                    }
+                }
+                return "";
+            } else {
+                throw new Error('С сервера пришли пустые данные')
+            }
+        }
+    }
+})
+
+/* обработка StreamRendering */
+/*class Ii extends HTMLElement {
+    // срабатывает при поступлении каждой новой порции данных из потока рендеринга Блазор
+    connectedCallback() {
+        //alert('asd')
+        const e = this.parentNode;
+        e.parentNode?.removeChild(e),
+            e.childNodes.forEach((e => {
+                if (e instanceof HTMLTemplateElement) {
+                    replaceDataStream(e);
+                }
+            }
+            ))
+    }
+}
+customElements.define("blazor-ssr-end", Ii)
+
+// замена предварительного контента на основной контент, который был загружен с задержкой в режиме потока (StreamRendering)
+function replaceDataStream(templateElement) {
+    // Get the blazor-component-id attribute value
+    const componentId = templateElement.getAttribute('blazor-component-id');
+
+    // Find the corresponding start and end comments
+    let startComment = findComment('bl:' + componentId);
+    let endComment = findComment('/bl:' + componentId);
+
+    if (startComment === null && endComment === null) {
+        const targetName = templateElement.content.cloneNode(true).firstChild.getAttribute('msu-component-target');
+        if (targetName !== null) {
+            startComment = findComment('bl:'+componentId, targetName);
+            endComment = findComment('/bl:'+componentId, targetName);
+        }
+    }
+
+    // If both start and end comments are found
+    if (startComment && endComment) {
+        // Get the parent node (container) of the comments
+        const containerNode = startComment.parentNode;
+
+        // Create a temporary document fragment to hold the template content
+        const tempFragment = document.createDocumentFragment();
+        tempFragment.appendChild(templateElement.content.cloneNode(true));
+
+        // Replace the content between start and end comments with template content
+        let currentNode = startComment.nextSibling;
+        while (currentNode && currentNode !== endComment) {
+            containerNode.removeChild(currentNode);
+            currentNode = startComment.nextSibling;
+        }
+
+        // Insert each child node of the fragment before the endComment
+        while (tempFragment.firstChild) {
+            containerNode.insertBefore(tempFragment.firstChild, endComment);
+        }
+
+        // Remove the template element
+        templateElement.remove();
+    }
+}
+
+// Function to find a comment node based on its text content
+function findComment(textContent, targetName) {
+    if (targetName === undefined || targetName === null || targetName === '') targetName = 'main-cont';
+    const allNodes = document.getElementById(targetName).childNodes; //document.body.childNodes;
+    for (let i = 0; i < allNodes.length; i++) {
+        if (allNodes[i].nodeType === Node.COMMENT_NODE && allNodes[i].textContent.trim() === textContent) {
+            return allNodes[i];
+        }
+    }
+    return null;
+}
+
+// начало обработки StreamRendering
+function startReplaceDataStream() {
+
+    //const ssrElements = document.querySelectorAll('blazor-ssr');
+
+    Array.prototype.slice.call(document.querySelectorAll('blazor-ssr')).forEach(function (ssrElement) {
+        // Get all template elements with blazor-component-id attribute
+        //const templateElements = document.querySelectorAll('template[blazor-component-id]');
+
+        // Iterate through each template element
+        Array.prototype.slice.call(document.querySelectorAll('template[blazor-component-id]')).forEach(function (templateElement) {
+            replaceDataStream(templateElement);
+        });
+
+        ssrElement.remove();
+    });
+}*/
+
+
+
+
 function loadScript(src, callback) {
     let script = document.createElement('script');
     script.src = src;
@@ -412,11 +570,11 @@ function loadScript(src, callback) {
 // Create the event.
 //const event = document.createEvent("Event");
 // Define that the event name is 'build'.
-//event.initEvent("on-get-dns");
+//event.initEvent("msu-on-get-dns");
 
 // Listen for the event.
 /*document.getElementById('main-cont').addEventListener(
-    "on-get-dns",
+    "msu-on-get-dns",
     function (e) {
         debugger;
     },
@@ -427,42 +585,56 @@ function loadScript(src, callback) {
 if (navigator.userAgent.indexOf('MSIE') !== -1
     || navigator.appVersion.indexOf('Trident/') > -1) {
 
+    isIE = true;
+
     /* Polyfill URL method IE 11 */
     // ES5
     if (typeof window.URL !== 'function') {
-        window.URL = function (url) {
-            var protocol = url.split('//')[0],
+        window.URL = function (url, base) {
+            let ind = url.indexOf('http') === 0 ? 1 : 0;
+
+            var protocol = ind === 0 ? '' : url.split('//')[0],
                 comps = url.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
-                host = comps[0],
+                host = ind === 0 ? '' : comps[0],
                 search = comps[comps.length - 1].split('?')[1],
+                tmp = host.split(':'),
+                port = ind === 0 ? '' : tmp[1],
+                hostname = ind === 0 ? '' : tmp[0];
+
+            if (base !== undefined && base !== null) {
+                var protocol = base.split('//')[0],
+                comps2 = base.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
+                host = comps2[0],
                 tmp = host.split(':'),
                 port = tmp[1],
                 hostname = tmp[0];
+            }
 
             search = typeof search !== 'undefined' ? '?' + search : '';
 
             var params = [];
-            if (search !== "") {
-                params = search
-                    .slice(1)
-                    .split('&')
-                    .map(function (p) { return p.split('='); })
-                    .reduce(function (p, c) {
-                        var parts = c.split('=', 2).map(function (param) { return decodeURIComponent(param); });
-                        if (parts.length == 0 || parts[0] != param) return (p instanceof Array) && !asArray ? null : p;
-                        return asArray ? p.concat(parts.concat(true)[1]) : parts.concat(true)[1];
-                    }, []);
-            }
+            //// выдаёт ошибку, поэтому закомментировано
+            //if (search !== "") {
+            //    params = search
+            //        .slice(1)
+            //        .split('&')
+            //        .map(function (p) { return p.split('='); })
+            //        .reduce(function (p, c) {
+            //            var parts = c.split('=', 2).map(function (param) { return decodeURIComponent(param); });
+            //            if (parts.length == 0 || parts[0] != param) return (p instanceof Array) && !asArray ? null : p;
+            //            return asArray ? p.concat(parts.concat(true)[1]) : parts.concat(true)[1];
+            //        }, []);
+            //}
 
             return {
                 hash: url.indexOf('#') > -1 ? url.substring(url.indexOf('#')) : '',
                 protocol: protocol,
                 host: host,
                 hostname: hostname,
-                href: url,
-                pathname: '/' + comps.splice(1).map(function (o) { return /\?/.test(o) ? o.split('?')[0] : o; }).join('/'),
+                href: (protocol !== "" ? (protocol + '//' + host) : "") + "/" + url,
+                pathname: '/' + comps.splice(ind).map(function (o) { return /\?/.test(o) ? o.split('?')[0] : o; }).join('/'),
                 search: search,
-                origin: protocol + '//' + host,
+                origin: protocol !== "" ? (protocol + '//' + host) : "",
                 port: typeof port !== 'undefined' ? port : '',
                 searchParams: {
                     get: function (p) {
@@ -475,22 +647,44 @@ if (navigator.userAgent.indexOf('MSIE') !== -1
     }
     /* Polyfill IE 11 end */
 
+    /* это для работы с StreamRendering */
+    /*if (typeof HTMLTemplateElement === 'undefined') {
+        (function () {
 
-    /*const event = document.createEvent("CustomEvent");
-    event.initCustomEvent("on-get-dns", true, false, undefined);
+            var TEMPLATE_TAG = 'template';
 
-    // Polyfill CustomEvent method IE 11 
-    (function () {
-        if (typeof window.CustomEvent === "function") return false;
-        function CustomEvent(event, params) {
-            //params = params || { bubbles: false, cancelable: false, detail: undefined };
-            var evt = document.createEvent('CustomEvent');
-            evt.initCustomEvent(event, true, false, params);
-            return evt;
-        }
-        CustomEvent.prototype = window.Event.prototype;
-        window.CustomEvent = CustomEvent;
-    })();*/
+            HTMLTemplateElement = function () { }
+            HTMLTemplateElement.prototype = Object.create(HTMLElement.prototype);
+
+            HTMLTemplateElement.decorate = function (template) {
+                if (template.content) {
+                    return;
+                }
+                template.content = template.ownerDocument.createDocumentFragment();
+                var child;
+                while (child = template.firstChild) {
+                    template.content.appendChild(child);
+                }
+            }
+
+            HTMLTemplateElement.bootstrap = function (doc) {
+                var templates = doc.querySelectorAll(TEMPLATE_TAG);
+                Array.prototype.forEach.call(templates, function (template) {
+                    HTMLTemplateElement.decorate(template);
+                });
+            }
+
+            // auto-bootstrapping
+            // boot main document
+            addEventListener('DOMContentLoaded', function () {
+                HTMLTemplateElement.bootstrap(document);
+            });
+            
+        })();
+    }*/
+}
+else {
+
 
 }
 
