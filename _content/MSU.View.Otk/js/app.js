@@ -31,7 +31,7 @@ let isIE = false;
 document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/stars.gif')");*/
 
 
-window.onload = function () {
+/*window.onload = */function startOnLoad() {
 
     getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
@@ -45,18 +45,17 @@ window.onload = function () {
     //debugger;
     //if (isIE) startReplaceDataStream(); // это не правильно здесь использовать, т.к. onload срабатывает только после полной/окончательной загрузки всех данных, а у нас загружаться может в несколько этапов поток
 }
-
+addLoadEvent(startOnLoad);
 
 // самые первые действия сразу после загрузки всех ресурсов сайта
 function onLoadMain() {
 
     // кнопка "гамбургер"
     let toggleBtn = document.getElementsByClassName('navbar-toggle')[0];
-    let menu = document.getElementById('bs-navbar');
+    let menu = htmx.find("#bs-navbar");
     toggleBtn.addEventListener('click', function () {
-        menu.classList.toggle('in');
+        htmx.toggleClass(menu, "in");
     });
-
 }
 
 // управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
@@ -128,9 +127,10 @@ function backTop() {
 }
 
 // устанавливаем для автономного режима путь статических ресурсов (изображений)
-function imgSetSrc() {
+function imgSetSrc(targetEl) {
     if (location.hostname === "") { // это для автономного режима
-        let elements = document.getElementsByTagName('img');
+        if (targetEl === undefined) targetEl = document;
+        let elements = targetEl.getElementsByTagName('img');
         for (let i = 0; i < elements.length; i++) {
             const element = elements[i];
             if (element == null) continue;
@@ -181,7 +181,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     //else isFirstLoadRequest = false;
 
     let detail = evt.detail;
-    if (detail.headers["HX-Trigger"] !== undefined && detail.headers["HX-Trigger"] !== null && detail.headers["HX-Trigger"].indexOf('msu-') !== 0) return; // для всех триггеров, которые не начинаются с msu- не выполняем нижележащий код, например, для триггера "quote-block". Т.к. иначе подставляются к запросу .spa
+    if (!isAutonomy() && detail.headers["HX-Trigger"] !== undefined && detail.headers["HX-Trigger"] !== null && detail.headers["HX-Trigger"].indexOf('msu-') !== 0) return; // для всех триггеров, которые не начинаются с msu- не выполняем нижележащий код, например, для триггера "quote-block". Т.к. иначе подставляются к запросу .spa
 
     let path = detail.path;
 
@@ -208,7 +208,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     }
 
     let url = getURL(path);
-    detail.path = (sendExtSPA && detail.boosted && detail.path.indexOf('.spa') === -1) ? (detail.path.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
+    detail.path = (sendExtSPA && detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
 
     // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
     if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
@@ -221,6 +221,12 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
 document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
     returnOriginalExtension(evt); // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
+});
+
+document.body.addEventListener('htmx:afterSwap', function (evt) {
+    if (location.hostname === "" && evt.detail.boosted) { // это для автономного режима
+        imgSetSrc(evt.detail.target);
+    }
 });
 
 // событие: произошла ошибка при запросе через htmx (например, не найдена страница или ошибка 500)
@@ -251,11 +257,13 @@ document.body.addEventListener('htmx:beforeSwap', function (evt) {
         let a = 1;
     }
 
-    let menu = document.getElementById('bs-navbar');
+    let menu = htmx.find("#bs-navbar");
     if(menu.classList.contains('in') === true)
-        menu.classList.toggle('in');
+        htmx.toggleClass(menu, "in");
 
-    if (evt.detail.boosted && evt.srcElement.offsetParent.firstChild && evt.srcElement.offsetParent.firstChild.getAttribute('id') === "quote-block")
+    if (evt.detail.boosted &&
+        (evt.srcElement.offsetParent.firstChild.attributes && evt.srcElement.offsetParent.firstChild.getAttribute('id') === "quote-block" ||
+        evt.detail.target.attributes && evt.detail.target.getAttribute('id') === "quote-block"))
         evt.detail.target = htmx.find("#main-cont"); // т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится
 
 });
@@ -384,10 +392,10 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
                         if (isAlert) alert("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка: " + e.message);
                     }
 
-
+                    let isLoadErrorVal = isLoadError();
                     // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие msu-on-get-dns (используется в hx-trigger)
-                    if (urls.length > 0 && isLoadError() || isAutonomy()) {
-                        callNewServer();
+                    if (urls.length > 0 && isLoadErrorVal || isAutonomy()) {
+                        if (isLoadErrorVal) callNewServer();
 
                         htmx.trigger('#main-cont', "msu-on-get-dns", { detail: true });
                         /*const eventVal = new CustomEvent("msu-on-get-dns", { detail: true });
@@ -448,14 +456,16 @@ htmx.defineExtension('json-response', {
 
                         // для БВ очищаем подпись-ссылку на Послание
                         if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
-                            var signature = htmx.find("#signature");
+                            htmx.remove(htmx.find("#signature"));
+                            /*var signature = htmx.find("#signature");
                             if (signature.parentNode) {
                                 signature.parentNode.removeChild(signature);
-                            }
+                            }*/
                             //signature.remove();
                         }
 
-                        htmx.process("#quote-block"); // document.body
+                        htmx.process(/*"#quote-block"*/targetElt); // document.body
+                        var a = 1;
                     }
                 }
                 return "";
@@ -465,6 +475,29 @@ htmx.defineExtension('json-response', {
         }
     }
 })
+
+// С пом. этой функции можно много раз подключать обработчик window.onload (по умолчанию можно отолько один раз подключить, все остальные разы затираются)
+function addLoadEvent(func) {
+    var oldonload = window.onload;
+    if (typeof window.onload != 'function') {
+        window.onload = func;
+    }
+    else {
+        window.onload = function () {
+            oldonload();
+            func();
+        }
+    }
+}
+
+function domReady(fn) {
+    // If we're early to the party
+    document.addEventListener("DOMContentLoaded", fn);
+    // If late; I mean on time.
+    if (document.readyState === "interactive" || document.readyState === "complete") {
+        fn();
+    }
+}
 
 /* обработка StreamRendering */
 /*class Ii extends HTMLElement {
@@ -592,6 +625,7 @@ if (navigator.userAgent.indexOf('MSIE') !== -1
     if (typeof window.URL !== 'function') {
         window.URL = function (url, base) {
             let ind = url.indexOf('http') === 0 ? 1 : 0;
+            if (url.indexOf('/') === 0) url = url.substring(1);
 
             var protocol = ind === 0 ? '' : url.split('//')[0],
                 comps = url.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
