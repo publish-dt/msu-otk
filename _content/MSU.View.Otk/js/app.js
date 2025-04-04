@@ -126,7 +126,7 @@ function backTop() {
     });*/
 }
 
-// устанавливаем для автономного режима путь статических ресурсов (изображений)
+// устанавливаем для автономного режима путь статических ресурсов (изображений) или ресурсов из БД
 function imgSetSrc(targetEl) {
     if (location.hostname === "") { // это для автономного режима
         if (targetEl === undefined) targetEl = document;
@@ -136,8 +136,10 @@ function imgSetSrc(targetEl) {
             if (element == null) continue;
 
             let src = element.getAttribute("src");
+            if (src.indexOf('http') === 0) continue;
+
             let imgHost = StaticResourcesHost;
-            if (src.indexOf(cachePathFile+'/') !== -1) continue; // imgHost = hostname; //  пропускаем изображения из БД
+            if (src.indexOf(cachePathFile+'/') !== -1) imgHost = hostname; // continue; //  это ресурс/изображение из БД
             element.src = imgHost + (src.indexOf('/') === 0 ? "" : "/") + src;
         }
     }
@@ -147,16 +149,16 @@ function imgSetSrc(targetEl) {
 // а так же это для автономного режима получаем путь / байты изображения из БД, когда через механизм браузера не удалось загрузить(не было найдено изображение по указанному пути)
 window.getImgData = function (imgEl) {
     if (isAutonomy() || hostname !== "") { // это для автономного и статического режима
-        const src = imgEl.getAttribute("src");
-        const srcFull = hostname + (src.indexOf('/') === 0 ? "" : "/") + src;
+        let src = imgEl.getAttribute("src");
+        if (src.indexOf('http') !== 0) src = hostname + (src.indexOf('/') === 0 ? "" : "/") + src;
 
         // ведём учёт попыток неудавшихся загрузок изображений. Только одна повторная попытка с того же хоста. (это нужно, чтобы не зацикливалась попытка загрузки изображений с одного и того же хоста)
-        if (numbTryLoadImg[srcFull] === undefined) {
-            numbTryLoadImg[srcFull] = true;
-            imgEl.src = srcFull;
+        if (numbTryLoadImg[src] === undefined) {
+            numbTryLoadImg[src] = true;
+            imgEl.src = src;
         }
         else {
-            delete numbTryLoadImg[srcFull]; // удаляем использованную попытку загрузки конкретного изображения
+            delete numbTryLoadImg[src]; // удаляем использованную попытку загрузки конкретного изображения
         }
     }
 }
@@ -218,9 +220,33 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     if (isAlert) alert("hostname = "+hostname);
 });
 
-
-document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
+document.body.addEventListener('htmx:beforeHistoryUpdate', function (evt) { // beforeOnLoad
     returnOriginalExtension(evt); // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
+});
+
+// событие: перед заменой таргета полученными в результате запроса данными
+document.body.addEventListener('htmx:beforeSwap', function (evt) {
+
+    if (evt.detail.xhr.status === 404) { // это, ВРОДЕ, для того, чтобы не зацикливалось
+        evt.detail.shouldSwap = true;
+        evt.detail.isError = false;
+        //evt.detail.target = htmx.find("#teapot");
+    }
+    else if (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600) {
+        //alert("Произошла ошибка на сервере! Попробуйте позже.");
+        //getAddressFromDNS(false, evt, selNewServer);
+        let a = 1;
+    }
+
+    let menu = htmx.find("#bs-navbar");
+    if(menu.classList.contains('in') === true)
+        htmx.toggleClass(menu, "in");
+
+    if (evt.detail.boosted &&
+        (evt.srcElement.offsetParent.firstChild.attributes && evt.srcElement.offsetParent.firstChild.getAttribute('id') === "quote-block" ||
+        evt.detail.target.attributes && evt.detail.target.getAttribute('id') === "quote-block"))
+        evt.detail.target = htmx.find("#main-cont"); // т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится
+
 });
 
 document.body.addEventListener('htmx:afterSwap', function (evt) {
@@ -244,37 +270,14 @@ document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
     //returnOriginalExtension(evt);
 });
 
-// событие: перед заменой таргета полученными в результате запроса данными
-document.body.addEventListener('htmx:beforeSwap', function (evt) {
-    if (evt.detail.xhr.status === 404) { // это, ВРОДЕ, для того, чтобы не зацикливалось
-        evt.detail.shouldSwap = true;
-        evt.detail.isError = false;
-        //evt.detail.target = htmx.find("#teapot");
-    }
-    else if (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600) {
-        //alert("Произошла ошибка на сервере! Попробуйте позже.");
-        //getAddressFromDNS(false, evt, selNewServer);
-        let a = 1;
-    }
-
-    let menu = htmx.find("#bs-navbar");
-    if(menu.classList.contains('in') === true)
-        htmx.toggleClass(menu, "in");
-
-    if (evt.detail.boosted &&
-        (evt.srcElement.offsetParent.firstChild.attributes && evt.srcElement.offsetParent.firstChild.getAttribute('id') === "quote-block" ||
-        evt.detail.target.attributes && evt.detail.target.getAttribute('id') === "quote-block"))
-        evt.detail.target = htmx.find("#main-cont"); // т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится
-
-});
-
 // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
 function returnOriginalExtension(evt) {
-    if (evt.detail.elt.localName == 'a') {
-        const url = new URL(evt.detail.elt.href);
+    if (evt.detail.boosted && evt.detail.requestConfig.elt.localName == 'a') { // evt.detail.elt.localName
+        const url = new URL(evt.detail.requestConfig.elt.href); // evt.detail.elt.href
 
-        evt.detail.pathInfo.responsePath = url.pathname;
-        evt.detail.requestConfig.path = url.pathname;
+        evt.detail.history.path = url.pathname;
+        /*evt.detail.pathInfo.responsePath = url.pathname;
+        evt.detail.requestConfig.path = url.pathname;*/
     }
 }
 
@@ -419,6 +422,7 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
             if (isAlert) alert("Ошибка при получении доменов: " + response.status);
         }*/
     }
+    else if (isAutonomy()) htmx.trigger('#main-cont', "msu-on-get-dns", { detail: true });
 }
 
 function getURL(path, newHostname) {
