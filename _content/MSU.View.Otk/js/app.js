@@ -1,16 +1,19 @@
 // let удалено (у тех, которые ещё раз присваиваются (в файле conf.js)), т.к. ошибка возникает, когда через историю браузера возвращаемся назад
-domain = "";
-hostname = "";
-isStaticMode = false;
-isAlert = false;
-dnsLinks = "dnslink.msu.linkpc.net";
-sendExtSPA = true; // подменять, для htmx, расширение отправляемого запроса на .spa
+let domain = "";
+let hostname = "";
+let isStaticMode = false;
+let isAlert = false;
+let dnsLinks = "dnslink.msu.linkpc.net";
+let sendExtSPA = true; // подменять, для htmx, расширение отправляемого запроса на .spa
 
-prefix = "";
-StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // надо дополнительно получать этот хост через ajax, т.к. этот CDN может быть недоступен и приложение будет не работоспособно.
-cachePathFile = "_cnt";
+let prefix = "";
+let StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // надо дополнительно получать этот хост через ajax, т.к. этот CDN может быть недоступен и приложение будет не работоспособно.
+let cachePathFile = "_cnt";
 
-originalHostname = hostname; // запоминаем изначальный хост, чтобы потом к нему вернуться, после смены на дополнительный хост, когда текущий недоступен
+let originalHostname = hostname; // запоминаем изначальный хост, чтобы потом к нему вернуться, после смены на дополнительный хост, когда текущий недоступен
+
+
+
 
 let isQuoteRequestVal = false;
 let isExtRequestVal = true;
@@ -18,9 +21,13 @@ let isExtRequestVal = true;
 let urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
 let newHosts = {}; // список новых/дополнительных хостов (т.к. текущий недоступен). Это не полный список, а только те, к которым уже был выполнен запрос, т.е уже знаем рабочий этот хост или недоступный
 let isNewHost = false; // установлен новый хост, т.к. текущий недоступен
+let badHosts = []; // список сбойных/недоступных хостов
+let queue = []; // очередь сбойных запросов. Они начинают обрабатываться, когда был получен список хостов из DnsLink
 let numbMinutes = 30; // количество минут, по истечению которых будет сброшен список новых хостов (newHosts)
 let numbTryLoadImg = {}; // попытки загрузок изображений при ошибке их загрузке
 let isIE = false;
+const triggerOnload = "msu-on-get-dns";
+let isReadDnsLinks = false; // dnsLinks получен
 
 /*window.onerror = function (message, url, line, col, error) {
     if (isAlert) alert(message + "\n В " + line + ":" + col + " на " + url);
@@ -191,7 +198,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
         (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true) || // или если при предыдущей попытке не найден
         isNewHost // или при предыдущей попытке был установлен новый хост, значит и последующие заприсы будем выполнять к этому новому хосту, пока он не сброситься 
     ) {
-        //// это нужно только только для IE11, когда срабатывает событие "msu-on-get-dns"
+        //// это нужно только только для IE11, когда срабатывает событие triggerOnload
         //if (typeof window.CustomEvent === "function" &&
         //    (navigator.userAgent.indexOf('MSIE') !== -1 || navigator.appVersion.indexOf('Trident/') > -1)) {
         //    detail = evt.detail.detail;
@@ -199,7 +206,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
         detail.headers['MSU-Dev'] = prefix;
         path = detail.path;
-        if (!isAutonomy() && detail.triggeringEvent !== undefined && detail.triggeringEvent.type === "msu-on-get-dns") { // detail.headers["HX-Trigger"] === "main-cont"
+        if (!isAutonomy() && detail.triggeringEvent !== undefined && detail.triggeringEvent.type === triggerOnload) { // detail.headers["HX-Trigger"] === "main-cont"
             //if (path.indexOf('http') !== -1) return new URL(path);
             if (detail.headers["HX-Current-URL"] !== undefined) {
                 let hXCurrentURL = detail.headers["HX-Current-URL"];
@@ -214,8 +221,9 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
     // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
     if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
-        if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
-        else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
+        callTriggerExt();
+        /*if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
+        else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""*/
 
     if (isAlert) alert("hostname = "+hostname);
 });
@@ -245,7 +253,7 @@ document.body.addEventListener('htmx:beforeSwap', function (evt) {
     if (evt.detail.boosted &&
         (evt.srcElement.offsetParent.firstChild.attributes && evt.srcElement.offsetParent.firstChild.getAttribute('id') === "quote-block" ||
         evt.detail.target.attributes && evt.detail.target.getAttribute('id') === "quote-block"))
-        evt.detail.target = htmx.find("#main-cont"); // т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится
+        evt.detail.target = htmx.find("#main-cont"); // при клике по ссылке в цитате, т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится 
 
 });
 
@@ -266,6 +274,8 @@ document.body.addEventListener('htmx:responseError', function (evt) {
 
 // событие: произошла ошибка при запросе через htmx (например, недоступен сервер)
 document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
+    const url = new URL(evt.detail.pathInfo.finalRequestPath);
+    badHosts[url.origin] = true;
     callNewServer(evt);
     //returnOriginalExtension(evt);
 });
@@ -281,13 +291,23 @@ function returnOriginalExtension(evt) {
     }
 }
 
-// дополнительные запросы всегда выполняются не к домену по умолчанию (т.е. на котором открыт сайт), а к доп. хостам (для автономного режима всегда есть доп. хосты)
+function callTriggerExt() {
+    if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
+    else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
+}
+
+// дополнительные запросы всегда выполняются не к домену по умолчанию (т.е. на котором открыт сайт), а к доп. хостам (для автономного режима всегда есть доп. хост)
 function reCallRequest(evt) {
     if (hostname !== "") {
         //var url = new URL(evt.detail.pathInfo.requestPath, evt.detail.pathInfo.requestPath.indexOf('http') !== -1 ? '' : hostname);
         let url = getURL(evt.detail.pathInfo.requestPath, hostname);
         let path = (sendExtSPA && evt.detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href;
-        htmx.ajax('GET', path/*pathname*/, { target: '#main-cont'/*, swap: 'outerHTML'*/ }).then(
+        if (evt.srcElement["htmx-internal-data"].listenerInfos.length > 0
+            && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger // если элемент первоначально был вызван через триггер, то снова вызываем этот триггер
+            && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger.indexOf('msu-ext-') === 0) {
+            callTriggerExt();
+        }
+        else htmx.ajax('GET', path, { target: evt.detail.target.getAttribute('id')/*'#main-cont', swap: 'outerHTML'*/ }).then(
             function (result) {
                 /* обработает успешное выполнение */
                 let a = 1;
@@ -308,29 +328,33 @@ function callNewServer(evt) {
 
         if (isNewHost === false) firstTime = true;
 
-        isNewHost = false;
-        for (var i = 0; i < urls.length; i++) {
+        if (firstTime || badHosts[hostname] === true) { // текущий хост уже отмечен как сбойный - пробуем другой хост
+
+            isNewHost = false;
+            for (var i = 0; i < urls.length; i++) {
             
-            if (newHosts[urls[i]] === undefined && // этот хост мы ещё не использовали
-                urls[i] !== location.origin &&  // нам не надо использовать хост, который совпадает с хостом из адресной строки браузера
-                (location.protocol !== "https:" ||
-                    (location.protocol === "https:" && urls[i].indexOf('http:') === -1) // http нельзя вызывать из https, по правилам безопасности
-                )
-            ) {
+                if (newHosts[urls[i]] === undefined && // этот хост мы ещё не пробовали
+                    urls[i] !== location.origin &&  // нам не надо использовать хост, который совпадает с хостом из адресной строки браузера
+                    (location.protocol !== "https:" ||
+                        (location.protocol === "https:" && urls[i].indexOf('http:') === -1) // http нельзя вызывать из https, по правилам безопасности
+                    )
+                ) {
 
-                newHosts[urls[i]] = true;
-                hostname = urls[i];
-                if (isAlert) console.log("Новый хост: " + hostname);
-                isNewHost = true;
+                    newHosts[urls[i]] = true;
+                    hostname = urls[i];
+                    if (isAlert) console.log("Новый хост: " + hostname);
+                    isNewHost = true;
 
-                if (evt !== undefined) reCallRequest(evt);
+                    if (evt !== undefined) reCallRequest(evt);
 
-                break;
-            }
-            else if (newHosts[urls[i]] === true) {
-                newHosts[urls[i]] = false; // отключаем ранее использованный хост
+                    break;
+                }
+                else if (newHosts[urls[i]] === true) {
+                    newHosts[urls[i]] = false; // отключаем ранее испробованный хост, чтобы в новом цикле его можно было снова пробовать
+                }
             }
         }
+        else if (evt !== undefined) reCallRequest(evt); // это параллельный запрос, который мы не пробовали ещё обработать с этим хостом
 
         // через 30 мин., после первого изменения хоста, сбрасываем это новое значение и возвращаемся к исходному
         if (firstTime === true && isNewHost === true) {
@@ -350,8 +374,10 @@ function callNewServer(evt) {
                 alert("Все сервера недоступны! Попробуйте снова, через некоторое время.");
         }
     }
+    else if (dnsLinks !== "" && !isReadDnsLinks)
+        queue.push(evt);
     else
-        if (evt.detail.boosted /*evt.detail.target.getAttribute('id') === "main-cont"*/)
+        if (evt.detail.boosted || (evt.detail.requestConfig.triggeringEvent && evt.detail.requestConfig.triggeringEvent.type === triggerOnload) /*evt.detail.target.getAttribute('id') === "main-cont"*/)
             alert("Сервер недоступен! Попробуйте снова, через некоторое время."); // это нужно отображать только для основного контента, а для ext и пр. не надо.
 }
 function returnOriginalHostname() {
@@ -390,6 +416,8 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
 
                             if (siteConf.minutes !== undefined) numbMinutes = siteConf.minutes;
                         }
+
+                        isReadDnsLinks = true;
                     } catch (e) {
                         console.error("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка:", e.message);
                         if (isAlert) alert("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка: " + e.message);
@@ -400,8 +428,12 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
                     if (urls.length > 0 && isLoadErrorVal || isAutonomy()) {
                         if (isLoadErrorVal) callNewServer();
 
-                        htmx.trigger('#main-cont', "msu-on-get-dns", { detail: true });
-                        /*const eventVal = new CustomEvent("msu-on-get-dns", { detail: true });
+                        for (var i = 0; i < queue.length; i++) {
+                            callNewServer(queue.shift()); // это стек FIFO
+                        }
+
+                        htmx.trigger('#main-cont', triggerOnload, { detail: true });
+                        /*const eventVal = new CustomEvent(triggerOnload, { detail: true });
                         document.getElementById('main-cont').dispatchEvent(eventVal);*/
                     }
                 }
@@ -422,7 +454,7 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
             if (isAlert) alert("Ошибка при получении доменов: " + response.status);
         }*/
     }
-    else if (isAutonomy()) htmx.trigger('#main-cont', "msu-on-get-dns", { detail: true });
+    else if (isAutonomy()) htmx.trigger('#main-cont', triggerOnload, { detail: true });
 }
 
 function getURL(path, newHostname) {
@@ -607,11 +639,11 @@ function loadScript(src, callback) {
 // Create the event.
 //const event = document.createEvent("Event");
 // Define that the event name is 'build'.
-//event.initEvent("msu-on-get-dns");
+//event.initEvent(triggerOnload);
 
 // Listen for the event.
 /*document.getElementById('main-cont').addEventListener(
-    "msu-on-get-dns",
+    triggerOnload,
     function (e) {
         debugger;
     },
