@@ -302,7 +302,8 @@ function reCallRequest(evt) {
         //var url = new URL(evt.detail.pathInfo.requestPath, evt.detail.pathInfo.requestPath.indexOf('http') !== -1 ? '' : hostname);
         let url = getURL(evt.detail.pathInfo.requestPath, hostname);
         let path = (sendExtSPA && evt.detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href;
-        if (evt.srcElement["htmx-internal-data"].listenerInfos.length > 0
+        if (evt.srcElement["htmx-internal-data"].listenerInfos
+            && evt.srcElement["htmx-internal-data"].listenerInfos.length > 0
             && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger // если элемент первоначально был вызван через триггер, то снова вызываем этот триггер
             && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger.indexOf('msu-ext-') === 0) {
             callTriggerExt();
