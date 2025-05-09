@@ -1,16 +1,16 @@
-// let удалено (у тех, которые ещё раз присваиваются (в файле conf.js)), т.к. ошибка возникает, когда через историю браузера возвращаемся назад
-let domain = "";
-let hostname = "";
-let isStaticMode = false;
-let isAlert = false;
-let dnsLinks = "dnslink.msu.linkpc.net";
-let sendExtSPA = true; // подменять, для htmx, расширение отправляемого запроса на .spa
+// let удалено (у тех, которые ещё раз присваиваются, т.к. ошибка возникает, когда через историю браузера возвращаемся назад, при этом заново загружается из кэша app.js и заново инициализируется, хотя он уже был ранее инициализирован (при первой загрузке страницы)
+domain = "";
+hostname = "";
+isStaticMode = false;
+isAlert = false;
+dnsLinks = "dnslink.msu.linkpc.net";
+sendExtSPA = true; // подменять, для htmx, расширение отправляемого запроса на .spa
 
-let prefix = "";
-let StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // надо дополнительно получать этот хост через ajax, т.к. этот CDN может быть недоступен и приложение будет не работоспособно.
-let cachePathFile = "_cnt";
+prefix = "";
+StaticResourcesHost = "https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main"; // надо дополнительно получать этот хост через ajax, т.к. этот CDN может быть недоступен и приложение будет не работоспособно.
+cachePathFile = "_cnt";
 
-let originalHostname = hostname; // запоминаем изначальный хост, чтобы потом к нему вернуться, после смены на дополнительный хост, когда текущий недоступен
+originalHostname = hostname; // запоминаем изначальный хост, чтобы потом к нему вернуться, после смены на дополнительный хост, когда текущий недоступен
 
 
 
@@ -29,14 +29,23 @@ let isIE = false;
 const triggerOnload = "msu-on-get-dns";
 let isReadDnsLinks = false; // dnsLinks получен
 
-/*window.onerror = function (message, url, line, col, error) {
-    if (isAlert) alert(message + "\n В " + line + ":" + col + " на " + url);
-};*/
+htmx.config.timeout = 10000; // (милисекунды) максимальное время ожидания результата запроса
+
 
 
 /*document.querySelector('.header').style.setProperty("--header-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/header.jpg')");
 document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/stars.gif')");*/
 
+
+
+
+/*  -------------  Функции первоначальной загрузки  -------------  */
+
+
+
+/*window.onerror = function (message, url, line, col, error) {
+    if (isAlert) alert(message + "\n В " + line + ":" + col + " на " + url);
+};*/
 
 /*window.onload = */function startOnLoad() {
 
@@ -64,6 +73,85 @@ function onLoadMain() {
         htmx.toggleClass(menu, "in");
     });
 }
+
+// получаем хост/url из DNS-записи
+function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
+    if (isOriginDnsLink === undefined) isOriginDnsLink = false;
+
+    if (dnsLinks !== "") {
+        let xhr = new XMLHttpRequest();
+        xhr.open("GET", "https://dns.google/resolve?name=" + dnsLinks + "&type=TXT");
+        xhr.send();
+
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                const res = JSON.parse(xhr.response);
+                if (res.Answer !== undefined && res.Answer.length > 0) {
+                    const data = res.Answer[0].data;
+                    const re = /'/gi;
+                    dataStr = data.replace(re, '"');
+                    try {
+                        const dataObj = JSON.parse(dataStr);
+                        const siteConf = dataObj.Sites[siteID];
+
+                        if (siteConf !== undefined) {
+                            if (siteConf.dnsLinks !== undefined) urls = siteConf.dnsLinks;
+
+                            if (isOriginDnsLink &&
+                                siteConf.originDnsLink !== undefined && siteConf.originDnsLink !== ''
+                            )
+                                originalHostname = siteConf.originDnsLink;
+
+                            if (siteConf.minutes !== undefined) numbMinutes = siteConf.minutes;
+                        }
+
+                        isReadDnsLinks = true;
+                    } catch (e) {
+                        console.error("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка:", e.message);
+                        if (isAlert) alert("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка: " + e.message);
+                    }
+
+                    let isLoadErrorVal = isLoadError();
+                    // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие msu-on-get-dns (используется в hx-trigger)
+                    if (urls.length > 0 && isLoadErrorVal || isAutonomy()) {
+                        if (isLoadErrorVal) callNewServer();
+
+                        for (var i = 0; i < queue.length; i++) {
+                            callNewServer(queue.shift()); // это стек FIFO
+                        }
+
+                        htmx.trigger('#main-cont', triggerOnload, { detail: true });
+                        /*const eventVal = new CustomEvent(triggerOnload, { detail: true });
+                        document.getElementById('main-cont').dispatchEvent(eventVal);*/
+                    }
+                }
+            }
+            else {
+                if (isAlert) alert("Ошибка при получении доменов: " + xhr.status);
+            }
+        };
+
+        xhr.onerror = function () { // происходит, только когда запрос совсем не получилось выполнить
+            if (isAlert) alert("Ошибка соединения");
+        };
+
+        /*let response = await fetch("https://dns.google/resolve?name=" + dnsLinks + "&type=TXT");
+        if (response.ok) { // если HTTP-статус в диапазоне 200-299
+            res = await response.json();
+        } else {
+            if (isAlert) alert("Ошибка при получении доменов: " + response.status);
+        }*/
+    }
+    else if (isAutonomy()) htmx.trigger('#main-cont', triggerOnload, { detail: true });
+}
+
+
+
+
+
+/*  -------------  Интерактивные элементы сайта  ----------------  */
+
+
 
 // управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
 function hiddenTooltip(el) {
@@ -98,21 +186,6 @@ function clearTooltip() {
 
 }
 
-function isLoadError() {
-    if (document.title === "Ошибка")
-        return true;
-
-    return false;
-}
-
-// проверка, является ли текущее приложение автономным или работает в статическом режиме, например, через GitHub Pages
-function isAutonomy(event) {
-    if (location.hostname === "" || isStaticMode === true)
-        return true;
-    else
-        return false;
-}
-
 // кнопка "Наверх сайта"
 function backTop() {
 
@@ -132,6 +205,14 @@ function backTop() {
         return false;
     });*/
 }
+
+
+
+
+
+/*  -------------  Работа с изображениями  ------------  */
+
+
 
 // устанавливаем для автономного режима путь статических ресурсов (изображений) или ресурсов из БД
 function imgSetSrc(targetEl) {
@@ -181,6 +262,15 @@ function openImg(imgEl) {
 }
 
 
+
+
+
+/* --------  Работа с HTMX  -------- */
+
+// схемы жизненного цикла HTMX - https://www.mostlylucid.net/blog/htmxandaspnetcore
+
+
+
 // это для автономного или статического режима (ссылка на статическом сайте никогда не ищется при работе через htmx)
 document.body.addEventListener('htmx:configRequest', function (evt) {
     // здесь использовать await нельзя!
@@ -210,7 +300,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
             //if (path.indexOf('http') !== -1) return new URL(path);
             if (detail.headers["HX-Current-URL"] !== undefined) {
                 let hXCurrentURL = detail.headers["HX-Current-URL"];
-                let url = new URL(hXCurrentURL);
+                let url = getURL(hXCurrentURL); // new URL
                 path = url.pathname;
             }
         }
@@ -274,7 +364,7 @@ document.body.addEventListener('htmx:responseError', function (evt) {
 
 // событие: произошла ошибка при запросе через htmx (например, недоступен сервер)
 document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
-    const url = new URL(evt.detail.pathInfo.finalRequestPath);
+    const url = getURL(evt.detail.pathInfo.finalRequestPath); // new URL
     badHosts[url.origin] = true;
     callNewServer(evt);
     //returnOriginalExtension(evt);
@@ -283,13 +373,56 @@ document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
 // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
 function returnOriginalExtension(evt) {
     if (evt.detail.boosted && evt.detail.requestConfig.elt.localName == 'a') { // evt.detail.elt.localName
-        const url = new URL(evt.detail.requestConfig.elt.href); // evt.detail.elt.href
+        const url = getURL(evt.detail.requestConfig.elt.href); // evt.detail.elt.href // new URL
 
         evt.detail.history.path = url.pathname;
         /*evt.detail.pathInfo.responsePath = url.pathname;
         evt.detail.requestConfig.path = url.pathname;*/
     }
 }
+
+/* Плагин для HTMX - обработка JSON-данных, полученных с сервера */
+htmx.defineExtension('json-response', {
+    transformResponse: function (text, xhr, elt) {
+        //var mustacheTemplate = htmx.closest(elt, '[mustache-template]')
+        var apiName = elt.getAttribute('id')
+        //debugger
+        if (apiName === 'api-ext') {
+            var data = JSON.parse(text)
+            if (data) {
+                for (var i = 0; i < data.length; i++) {
+                    var targetElt = htmx.find(data[i].target)
+                    if (targetElt) {
+                        targetElt.innerHTML = data[i].content;
+
+                        // для БВ очищаем подпись-ссылку на Послание
+                        if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
+                            htmx.remove(htmx.find("#signature"));
+                            /*var signature = htmx.find("#signature");
+                            if (signature.parentNode) {
+                                signature.parentNode.removeChild(signature);
+                            }*/
+                            //signature.remove();
+                        }
+
+                        htmx.process(/*"#quote-block"*/targetElt); // document.body
+                        var a = 1;
+                    }
+                }
+                return "";
+            } else {
+                throw new Error('С сервера пришли пустые данные')
+            }
+        }
+    }
+})
+
+
+
+
+
+/* -----------  Работа с повторными отправками запросов на другие хосты  ------------ */
+
 
 function callTriggerExt() {
     if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
@@ -387,76 +520,12 @@ function returnOriginalHostname() {
     if (isAlert) console.log("Вернули исходный хост: " + hostname);
 }
 
-// получаем хост/url из DNS-записи
-function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
-    if (isOriginDnsLink === undefined) isOriginDnsLink = false;
 
-    if (dnsLinks !== "") {
-        let xhr = new XMLHttpRequest();
-        xhr.open("GET", "https://dns.google/resolve?name=" + dnsLinks + "&type=TXT");
-        xhr.send();
 
-        xhr.onload = function () {
-            if (xhr.status === 200) {
-                const res = JSON.parse(xhr.response);
-                if (res.Answer !== undefined && res.Answer.length > 0) {
-                    const data = res.Answer[0].data;
-                    const re = /'/gi;
-                    dataStr = data.replace(re, '"');
-                    try {
-                        const dataObj = JSON.parse(dataStr);
-                        const siteConf = dataObj.Sites[siteID];
 
-                        if (siteConf !== undefined) {
-                            if (siteConf.dnsLinks !== undefined) urls = siteConf.dnsLinks;
 
-                            if (isOriginDnsLink &&
-                                siteConf.originDnsLink !== undefined && siteConf.originDnsLink !== ''
-                            )
-                                originalHostname = siteConf.originDnsLink;
+/*  ----------  Хелперы  ------------  */
 
-                            if (siteConf.minutes !== undefined) numbMinutes = siteConf.minutes;
-                        }
-
-                        isReadDnsLinks = true;
-                    } catch (e) {
-                        console.error("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка:", e.message);
-                        if (isAlert) alert("Ошибка при разборе json-данных из DNS TXT-записи. Ошибка: " + e.message);
-                    }
-
-                    let isLoadErrorVal = isLoadError();
-                    // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие msu-on-get-dns (используется в hx-trigger)
-                    if (urls.length > 0 && isLoadErrorVal || isAutonomy()) {
-                        if (isLoadErrorVal) callNewServer();
-
-                        for (var i = 0; i < queue.length; i++) {
-                            callNewServer(queue.shift()); // это стек FIFO
-                        }
-
-                        htmx.trigger('#main-cont', triggerOnload, { detail: true });
-                        /*const eventVal = new CustomEvent(triggerOnload, { detail: true });
-                        document.getElementById('main-cont').dispatchEvent(eventVal);*/
-                    }
-                }
-            }
-            else {
-                if (isAlert) alert("Ошибка при получении доменов: " + xhr.status);
-            }
-        };
-
-        xhr.onerror = function () { // происходит, только когда запрос совсем не получилось выполнить
-            if (isAlert) alert("Ошибка соединения");
-        };
-
-        /*let response = await fetch("https://dns.google/resolve?name=" + dnsLinks + "&type=TXT");
-        if (response.ok) { // если HTTP-статус в диапазоне 200-299
-            res = await response.json();
-        } else {
-            if (isAlert) alert("Ошибка при получении доменов: " + response.status);
-        }*/
-    }
-    else if (isAutonomy()) htmx.trigger('#main-cont', triggerOnload, { detail: true });
-}
 
 function getURL(path, newHostname) {
     let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (hostname === "" ? location.origin : hostname));
@@ -470,48 +539,28 @@ function getURL(path, newHostname) {
     }
 }
 
+function isLoadError() {
+    if (document.title === "Ошибка")
+        return true;
+
+    return false;
+}
+
+// проверка, является ли текущее приложение автономным или работает в статическом режиме, например, через GitHub Pages
+function isAutonomy(event) {
+    if (location.hostname === "" || isStaticMode === true)
+        return true;
+    else
+        return false;
+}
+
 function isExtRequest() {
     return isExtRequestVal;
 }
+
 function isQuoteRequest() {
     return isQuoteRequestVal;
 }
-
-/* Плагин для HTMX - обработка JSON-данных, полученных с сервера */
-htmx.defineExtension('json-response', {
-    transformResponse: function (text, xhr, elt) {
-        //var mustacheTemplate = htmx.closest(elt, '[mustache-template]')
-        var apiName = elt.getAttribute('id')
-        //debugger
-        if (apiName === 'api-ext') {
-            var data = JSON.parse(text)
-            if (data) {
-                for (var i = 0; i < data.length; i++) {
-                    var targetElt = htmx.find(data[i].target)
-                    if (targetElt) {
-                        targetElt.innerHTML = data[i].content;
-
-                        // для БВ очищаем подпись-ссылку на Послание
-                        if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
-                            htmx.remove(htmx.find("#signature"));
-                            /*var signature = htmx.find("#signature");
-                            if (signature.parentNode) {
-                                signature.parentNode.removeChild(signature);
-                            }*/
-                            //signature.remove();
-                        }
-
-                        htmx.process(/*"#quote-block"*/targetElt); // document.body
-                        var a = 1;
-                    }
-                }
-                return "";
-            } else {
-                throw new Error('С сервера пришли пустые данные')
-            }
-        }
-    }
-})
 
 // С пом. этой функции можно много раз подключать обработчик window.onload (по умолчанию можно отолько один раз подключить, все остальные разы затираются)
 function addLoadEvent(func) {
