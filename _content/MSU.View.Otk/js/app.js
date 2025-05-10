@@ -538,9 +538,9 @@ function getURL(path, newHostname) {
 
     if (baseUrl === '') return new URL(path); //baseUrl = undefined;
     else {
-        if (path.indexOf('http') === -1) return new URL((path.indexOf('/') === 0 ? '' : basePath.substring(0, basePath.length-1)) + path, baseUrl);
+        if (path.indexOf('http') === -1) return new URL((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length-1) : basePath) + path, baseUrl);
 
-        let url = new URL((path.indexOf('/') === 0 ? '' : basePath.substring(0, basePath.length-1)) + path);
+        let url = new URL((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length-1) : basePath) + path);
         return new URL(url.pathname, baseUrl);
     }
 }
