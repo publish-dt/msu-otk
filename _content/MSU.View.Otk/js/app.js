@@ -28,6 +28,7 @@ let numbTryLoadImg = {}; // попытки загрузок изображени
 let isIE = false;
 const triggerOnload = "msu-on-get-dns";
 let isReadDnsLinks = false; // dnsLinks получен
+let basePath = '';
 
 htmx.config.timeout = 10000; // (милисекунды) максимальное время ожидания результата запроса
 
@@ -49,6 +50,11 @@ document.querySelector('body').style.setProperty("--body-background", "url('" + 
 
 /*window.onload = */function startOnLoad() {
 
+    let baseUrl = document.baseURI;
+    baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length-1) : baseUrl;
+    let arrLen = baseUrl.split('/');
+    basePath = arrLen[arrLen.length-1];    
+    
     getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
     onLoadMain();
@@ -307,7 +313,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     }
 
     let url = getURL(path);
-    detail.path = (sendExtSPA && detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
+    detail.path = (sendExtSPA && detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === basePath ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
 
     // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
     if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
@@ -528,13 +534,10 @@ function returnOriginalHostname() {
 
 
 function getURL(path, newHostname) {
-    let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (hostname === "" ? document.baseURI/*location.origin*/ : hostname));
+    let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (hostname === "" ? location.origin : hostname));
 
     if (baseUrl === '') return new URL(path); //baseUrl = undefined;
     else {
-        baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length-1) : baseUrl;
-        let arrLen = baseUrl.split('/');
-        let basePath = arrLen[arrLen.length-1];
         if (path.indexOf('http') === -1) return new URL(basePath+path, baseUrl);
 
         let url = new URL(basePath+path);
