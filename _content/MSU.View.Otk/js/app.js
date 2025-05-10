@@ -538,9 +538,9 @@ function getURL(path, newHostname) {
 
     if (baseUrl === '') return new URL(path); //baseUrl = undefined;
     else {
-        if (path.indexOf('http') === -1) return new URL(basePath+path, baseUrl);
+        if (path.indexOf('http') === -1) return new URL(basePath.substring(0, basePath.length-1)+path, baseUrl);
 
-        let url = new URL(basePath+path);
+        let url = new URL(basePath.substring(0, basePath.length-1)+path);
         return new URL(url.pathname, baseUrl);
     }
 }
