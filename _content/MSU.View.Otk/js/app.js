@@ -53,7 +53,7 @@ document.querySelector('body').style.setProperty("--body-background", "url('" + 
     let baseUrl = document.baseURI;
     baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length-1) : baseUrl;
     let arrLen = baseUrl.split('/');
-    basePath = arrLen[arrLen.length-1];    
+    basePath = '/'+arrLen[arrLen.length-1]+'/';    
     
     getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
