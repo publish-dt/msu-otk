@@ -51,10 +51,10 @@ document.querySelector('body').style.setProperty("--body-background", "url('" + 
 /*window.onload = */function startOnLoad() {
 
     let baseUrl = document.baseURI;
-    baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length-1) : baseUrl;
+    baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     let arrLen = baseUrl.split('/');
-    basePath = '/'+arrLen[arrLen.length-1]+'/';    
-    
+    basePath = '/' + arrLen[arrLen.length - 1] + '/';  
+
     getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
     onLoadMain();
@@ -313,7 +313,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     }
 
     let url = getURL(path);
-    detail.path = (sendExtSPA && detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === basePath ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
+    detail.path = (sendExtSPA && detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === "/" ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
 
     // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
     if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
@@ -394,31 +394,39 @@ htmx.defineExtension('json-response', {
         var apiName = elt.getAttribute('id')
         //debugger
         if (apiName === 'api-ext') {
-            var data = JSON.parse(text)
-            if (data) {
-                for (var i = 0; i < data.length; i++) {
-                    var targetElt = htmx.find(data[i].target)
-                    if (targetElt) {
-                        targetElt.innerHTML = data[i].content;
+            if (text[0] === "{") {
+                try {
+                    var data = JSON.parse(text)
+                    if (data) {
+                        for (var i = 0; i < data.length; i++) {
+                            var targetElt = htmx.find(data[i].target)
+                            if (targetElt) {
+                                targetElt.innerHTML = data[i].content;
 
-                        // для БВ очищаем подпись-ссылку на Послание
-                        if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
-                            htmx.remove(htmx.find("#signature"));
-                            /*var signature = htmx.find("#signature");
-                            if (signature.parentNode) {
-                                signature.parentNode.removeChild(signature);
-                            }*/
-                            //signature.remove();
+                                // для БВ очищаем подпись-ссылку на Послание
+                                if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
+                                    htmx.remove(htmx.find("#signature"));
+                                    /*var signature = htmx.find("#signature");
+                                    if (signature.parentNode) {
+                                        signature.parentNode.removeChild(signature);
+                                    }*/
+                                    //signature.remove();
+                                }
+
+                                htmx.process(/*"#quote-block"*/targetElt); // document.body
+                                var a = 1;
+                            }
                         }
-
-                        htmx.process(/*"#quote-block"*/targetElt); // document.body
-                        var a = 1;
+                        return "";
+                    } else {
+                        throw new Error('С сервера пришли пустые данные')
                     }
+                } catch (e) {
+                    throw new Error(e.message)
                 }
-                return "";
-            } else {
-                throw new Error('С сервера пришли пустые данные')
             }
+            else
+                throw new Error('Неправильный формат данных (не json).')
         }
     }
 })
@@ -538,9 +546,9 @@ function getURL(path, newHostname) {
 
     if (baseUrl === '') return new URL(path); //baseUrl = undefined;
     else {
-        if (path.indexOf('http') === -1) return new URL((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length-1) : basePath) + path, baseUrl);
+        if (path.indexOf('http') === -1) return new URL((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length - 1) : basePath) + path, baseUrl);
 
-        let url = new URL((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length-1) : basePath) + path);
+        let url = new URL((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length - 1) : basePath) + path);
         return new URL(url.pathname, baseUrl);
     }
 }
