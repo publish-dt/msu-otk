@@ -5,12 +5,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="version" content="1.0.0-alpha1" />
-    <base href="/msu-otk/">
-    <meta name="description" content="&#x41F;&#x440;&#x44F;&#x43C;&#x43E;&#x435; &#x43E;&#x431;&#x440;&#x430;&#x449;&#x435;&#x43D;&#x438;&#x435; &#x412;&#x44B;&#x441;&#x448;&#x435;&#x433;&#x43E; &#x41A;&#x43E;&#x441;&#x43C;&#x438;&#x447;&#x435;&#x441;&#x43A;&#x43E;&#x433;&#x43E; &#x420;&#x430;&#x437;&#x443;&#x43C;&#x430; (&#x413;&#x43E;&#x441;&#x43F;&#x43E;&#x434;&#x430; &#x411;&#x43E;&#x433;&#x430;, &#x41E;&#x442;&#x446;&#x430; &#x410;&#x431;&#x441;&#x43E;&#x43B;&#x44E;&#x442;&#x430;) &#x43A; &#x447;&#x435;&#x43B;&#x43E;&#x432;&#x435;&#x447;&#x435;&#x441;&#x442;&#x432;&#x443;. &#x41A;&#x43D;&#x438;&#x433;&#x430;, &#x437;&#x430;&#x43F;&#x438;&#x441;&#x430;&#x43D;&#x43D;&#x430;&#x44F; &#x41C;&#x430;&#x441;&#x43B;&#x43E;&#x432;&#x44B;&#x43C; &#x41B;&#x435;&#x43E;&#x43D;&#x438;&#x434;&#x43E;&#x43C; &#x418;&#x432;&#x430;&#x43D;&#x43E;&#x432;&#x438;&#x447;&#x435;&#x43C;." />
+    <base href="/"><!-- /msu-otk/ -->
+    <meta name="description" content="Прямое обращение Высшего Космического Разума (Господа Бога, Отца Абсолюта) к человечеству. Книга, записанная Масловым Леонидом Ивановичем." />
     <meta name="author" content="Маслов Леонид Иванович">
 
-    <link rel="shortcut icon" href="https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/favicon.ico" type="image/x-icon">
-    
+    <link rel="shortcut icon" href="https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/_content/MSU.View.Otk/favicon.ico" type="image/x-icon" />
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" crossorigin="anonymous" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/hint.css/3.0.0/hint.min.css" integrity="sha512-Wh4+s2lPgPpBCBz8fdVpfOcEw3WJmNRxLefQZ9tlF6gH6iwf+LMZdJjB/qpSLWfk2WOgMqJmcmZDqDgihK5qCA==" crossorigin="anonymous" referrerpolicy="no-referrer">
 
@@ -33,7 +33,9 @@
                             <div class="col-md-6 col-md-offset-6 col-sm-8 col-sm-offset-4">
                                 <div class="col-md-6 col-sm-6 hidden-xs sm-unread-zindex"><div id="unreadBlock"></div></div>
 
-                                <div class="col-md-6 col-sm-6 hidden-xs pull-right baner-quote"></div>
+                                <div class="col-md-6 col-sm-6 hidden-xs pull-right baner-quote">
+                                    <div id="quote-block" hx-get="/ext/quote" hx-trigger="load[isQuoteRequest()], msu-ext-quote" hx-target="this" hx-push-url="false"></div>
+                                </div>
                             </div>
                             <div class="book">Эта Книга продиктована Высшим Космическим Разумом избранному Им Человеку в России</div>
                         </div>
@@ -54,7 +56,20 @@
                                     </div>
                                 </div>
 
-                                <div><div id="bs-navbar" class="collapse navbar-collapse" style><ul class="nav nav-pills nav-justified top-menu-ul"><li class="active"><a href="/">ГЛАВНАЯ</a></li><li class=""><a href="predislovie.html">ПРЕДИСЛОВИЕ ВСЕВЫШНЕГО</a></li><li class=""><a href="otkroveniya.html">ОТКРОВЕНИЯ</a></li><li class=""><a href="tolkovaniya.html">ТОЛКОВАНИЯ</a></li><li class=""><a href="year.html">НОВЫЕ ТЕКСТЫ</a></li><li class=""><a href="poems/year.html">КАТРЕНЫ</a></li><li class=""><a href="intforum.html">НОВОСТИ</a></li><li class=""><a href="novosti.html">ОБЪЯВЛЕНИЯ</a></li></ul></div></div>
+                                <div>
+                                    <div id="bs-navbar" class="collapse navbar-collapse">
+                                        <ul class="nav nav-pills nav-justified top-menu-ul">
+                                            <li class="active"><a href="/">ГЛАВНАЯ</a></li>
+                                            <li class=""><a href="predislovie.html">ПРЕДИСЛОВИЕ ВСЕВЫШНЕГО</a></li>
+                                            <li class=""><a href="otkroveniya.html">ОТКРОВЕНИЯ</a></li>
+                                            <li class=""><a href="tolkovaniya.html">ТОЛКОВАНИЯ</a></li>
+                                            <li class=""><a href="year.html">НОВЫЕ ТЕКСТЫ</a></li>
+                                            <li class=""><a href="poems/year.html">КАТРЕНЫ</a></li>
+                                            <li class=""><a href="intforum.html">НОВОСТИ</a></li>
+                                            <li class=""><a href="novosti.html">ОБЪЯВЛЕНИЯ</a></li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </nav>
                         </div>
                     </div>
@@ -66,7 +81,7 @@
             <div class="container-fluid">
                 <div class="row">
                     <main>
-                        <div id="main-cont" hx-get="/" hx-trigger="load[isAutonomy(event)]" class="col-lg-9 col-md-9 col-sm-8 col-xs-12 page-main large-monitor-center">
+                        <div id="main-cont" hx-get="/" hx-trigger="msu-on-get-dns" class="col-lg-9 col-md-9 col-sm-8 col-xs-12 page-main large-monitor-center">
 
 
 
@@ -97,7 +112,7 @@
             <div class="container-fluid">
                 <div class="row">
                     <div class="col-lg-9 col-md-9 col-sm-8 col-xs-12 col-lg-offset-260 col-md-offset-3 col-sm-offset-4 large-monitor-center">
-                        <p class="copyright">Copyright © <a href="mailto:maslovli@yandex.ru">Leonid Maslov</a> 2004-2024<br>При копировании материалов с Сайта <a href="https://otkroveniya.eu" target="_blank">ссылка на Первоисточник</a> обязательна.</p>
+                        <p class="copyright">Copyright © <a href="mailto:maslovli@yandex.ru">Leonid Maslov</a> 2004-<span id="footerYear"></span><br>При копировании материалов с Сайта <a href="https://otkroveniya.eu" target="_blank">ссылка на Первоисточник</a> обязательна.</p>
 
                         <div class="blok-metrik"></div>
                     </div>
@@ -107,21 +122,16 @@
     </div>
 
     <script>
-        window.onerror = function(message, url, line, col, error) {
-          alert(`${message}\n В ${line}:${col} на ${url}`);
+        window.onerror = function (message, url, line, col, error) {
+            alert(message + "\n В " + line + ":" + col + " на " + url);
         };
     </script>
-    
+
     <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.js"></script>
 
     <script type="text/javascript" src="https://publish-dt.github.io/msu-otk/_content/MSU.View.Otk/js/shared.js"></script>
     <script type="text/javascript" src="https://publish-dt.github.io/msu-otk/_content/MSU.View.Otk/js/app.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/publish-dt/msu-otk@main/conf.js"></script>
-
-    <script>
-        //hostname = "https://2.56.88.201:8085"; // NATS Dev
-        basePath = "/msu-otk/";        
-    </script>
+    <script type="text/javascript" src="https://publish-dt.github.io/msu-otk/conf.js"></script>
 
 </body>
 </html>
