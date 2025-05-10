@@ -528,7 +528,7 @@ function returnOriginalHostname() {
 
 
 function getURL(path, newHostname) {
-    let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (hostname === "" ? location.origin : hostname));
+    let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (hostname === "" ? document.baseURI/*location.origin*/ : hostname));
 
     if (baseUrl === '') return new URL(path); //baseUrl = undefined;
     else {
