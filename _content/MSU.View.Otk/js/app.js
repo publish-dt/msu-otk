@@ -1,9 +1,10 @@
 // let удалено (у тех, которые ещё раз присваиваются, т.к. ошибка возникает, когда через историю браузера возвращаемся назад, при этом заново загружается из кэша app.js и заново инициализируется, хотя он уже был ранее инициализирован (при первой загрузке страницы)
 domain = "";
-hostname = "";
-isStaticMode = false;
+hostname = typeof hostname !== 'undefined' && hostname !== "" ? hostname : "";
+dnsLinks = typeof dnsLinks !== 'undefined' && dnsLinks !== "" ? dnsLinks : ""; // dnslink.msu.linkpc.net // если пусто, то не пытаемся подключиться к другим хостам
+isStaticMode = typeof isStaticMode !== 'undefined' && isStaticMode !== "" ? isStaticMode : false;
+
 isAlert = false;
-dnsLinks = "dnslink.msu.linkpc.net";
 sendExtSPA = true; // подменять, для htmx, расширение отправляемого запроса на .spa
 
 prefix = "";
@@ -15,20 +16,20 @@ originalHostname = hostname; // запоминаем изначальный хо
 
 
 
-let isQuoteRequestVal = false;
-let isExtRequestVal = true;
+isQuoteRequestVal = false;
+isExtRequestVal = true;
 
-let urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
-let newHosts = {}; // список новых/дополнительных хостов (т.к. текущий недоступен). Это не полный список, а только те, к которым уже был выполнен запрос, т.е уже знаем рабочий этот хост или недоступный
-let isNewHost = false; // установлен новый хост, т.к. текущий недоступен
-let badHosts = []; // список сбойных/недоступных хостов
-let queue = []; // очередь сбойных запросов. Они начинают обрабатываться, когда был получен список хостов из DnsLink
-let numbMinutes = 30; // количество минут, по истечению которых будет сброшен список новых хостов (newHosts)
-let numbTryLoadImg = {}; // попытки загрузок изображений при ошибке их загрузке
-let isIE = false;
-const triggerOnload = "msu-on-get-dns";
-let isReadDnsLinks = false; // dnsLinks получен
-let basePath = '';
+urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
+newHosts = {}; // список новых/дополнительных хостов (т.к. текущий недоступен). Это не полный список, а только те, к которым уже был выполнен запрос, т.е уже знаем рабочий этот хост или недоступный
+isNewHost = false; // установлен новый хост, т.к. текущий недоступен
+badHosts = []; // список сбойных/недоступных хостов
+queue = []; // очередь сбойных запросов. Они начинают обрабатываться, когда был получен список хостов из DnsLink
+numbMinutes = 30; // количество минут, по истечению которых будет сброшен список новых хостов (newHosts)
+numbTryLoadImg = {}; // попытки загрузок изображений при ошибке их загрузке
+isIE = false;
+triggerOnload = "msu-on-get-dns";
+isReadDnsLinks = false; // dnsLinks получен
+basePath = '';
 
 htmx.config.timeout = 10000; // (милисекунды) максимальное время ожидания результата запроса
 
@@ -50,10 +51,12 @@ document.querySelector('body').style.setProperty("--body-background", "url('" + 
 
 /*window.onload = */function startOnLoad() {
 
-    let baseUrl = document.baseURI;
+    let url_ = new URL(document.baseURI);
+    basePath = url_.protocol === "file:" ? "/" : url_.pathname;
+    /*let baseUrl = document.baseURI;
     baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     let arrLen = baseUrl.split('/');
-    basePath = '/' + arrLen[arrLen.length - 1] + '/';  
+    basePath = '/' + arrLen[arrLen.length - 1] + '/';*/
 
     getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
@@ -148,7 +151,8 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
             if (isAlert) alert("Ошибка при получении доменов: " + response.status);
         }*/
     }
-    else if (isAutonomy()) htmx.trigger('#main-cont', triggerOnload, { detail: true });
+    else if (isAutonomy())
+        htmx.trigger('#main-cont', triggerOnload, { detail: true });
 }
 
 
@@ -174,7 +178,7 @@ function clearTooltip() {
             timeoutID = window.setTimeout(hiddenTooltip, 1500, event.target);
             listTimeoutID.push([event.target, timeoutID]);
         });
-        }
+    }
     );
     Array.prototype.slice.call(document.querySelectorAll('.hint--left')).forEach(function (box) {
         return box.addEventListener('mouseleave', function (event) {
@@ -187,7 +191,7 @@ function clearTooltip() {
                 }
             }
         });
-        }
+    }
     );
 
 }
@@ -233,7 +237,7 @@ function imgSetSrc(targetEl) {
             if (src.indexOf('http') === 0) continue;
 
             let imgHost = StaticResourcesHost;
-            if (src.indexOf(cachePathFile+'/') !== -1) imgHost = hostname; // continue; //  это ресурс/изображение из БД
+            if (src.indexOf(cachePathFile + '/') !== -1) imgHost = hostname; // continue; //  это ресурс/изображение из БД
             element.src = imgHost + (src.indexOf('/') === 0 ? "" : "/") + src;
         }
     }
@@ -286,12 +290,12 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     //else isFirstLoadRequest = false;
 
     let detail = evt.detail;
-    if (!isAutonomy() && detail.headers["HX-Trigger"] !== undefined && detail.headers["HX-Trigger"] !== null && detail.headers["HX-Trigger"].indexOf('msu-') !== 0) return; // для всех триггеров, которые не начинаются с msu- не выполняем нижележащий код, например, для триггера "quote-block". Т.к. иначе подставляются к запросу .spa
+    //if (!isAutonomy() && detail.headers["HX-Trigger"] !== undefined && detail.headers["HX-Trigger"] !== null && detail.headers["HX-Trigger"].indexOf('msu-') !== 0) return; // для всех триггеров, которые не начинаются с msu- не выполняем нижележащий код, например, для триггера "quote-block". Т.к. иначе подставляются к запросу .spa
 
     let path = detail.path;
 
     if (isAutonomy() ||  // это для автономного или статического режима
-        (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent.detail.notfound === true) || // или если при предыдущей попытке не найден
+        (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent !== null && evt.detail.triggeringEvent.detail.notfound === true) || // или если при предыдущей попытке не найден
         isNewHost // или при предыдущей попытке был установлен новый хост, значит и последующие заприсы будем выполнять к этому новому хосту, пока он не сброситься 
     ) {
         //// это нужно только только для IE11, когда срабатывает событие triggerOnload
@@ -313,15 +317,18 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     }
 
     let url = getURL(path);
-    detail.path = (sendExtSPA && detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === basePath ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
+    detail.path = (sendExtSPA
+        && (detail.boosted
+            || (detail.triggeringEvent !== undefined && evt.detail.triggeringEvent !== null && detail.triggeringEvent.type === triggerOnload))
+        && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === basePath ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
 
     // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
     if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
         callTriggerExt();
-        /*if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
-        else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""*/
+    /*if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
+    else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""*/
 
-    if (isAlert) alert("hostname = "+hostname);
+    if (isAlert) alert("hostname = " + hostname);
 });
 
 document.body.addEventListener('htmx:beforeHistoryUpdate', function (evt) { // beforeOnLoad
@@ -331,26 +338,40 @@ document.body.addEventListener('htmx:beforeHistoryUpdate', function (evt) { // b
 // событие: перед заменой таргета полученными в результате запроса данными
 document.body.addEventListener('htmx:beforeSwap', function (evt) {
 
-    if (evt.detail.xhr.status === 404) { // это, ВРОДЕ, для того, чтобы не зацикливалось
+    let isError = evt.detail.isError;
+
+    if (evt.detail.xhr.status === 404) {
         evt.detail.shouldSwap = true;
-        evt.detail.isError = false;
+        evt.detail.isError = false; // это, ВРОДЕ, для того, чтобы не зацикливалось
         //evt.detail.target = htmx.find("#teapot");
+
+        // для ext и прочих .spa не срабатывает htmx:responseError, поэтому обрабатываем их здесь
+        reCallRequest(evt, true);
     }
     else if (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600) {
         //alert("Произошла ошибка на сервере! Попробуйте позже.");
         //getAddressFromDNS(false, evt, selNewServer);
         let a = 1;
     }
+    else {
+        let menu = htmx.find("#bs-navbar");
+        if (menu.classList.contains('in') === true)
+            htmx.toggleClass(menu, "in");
 
-    let menu = htmx.find("#bs-navbar");
-    if(menu.classList.contains('in') === true)
-        htmx.toggleClass(menu, "in");
-
-    if (evt.detail.boosted &&
-        (evt.srcElement.offsetParent.firstChild.attributes && evt.srcElement.offsetParent.firstChild.getAttribute('id') === "quote-block" ||
-        evt.detail.target.attributes && evt.detail.target.getAttribute('id') === "quote-block"))
-        evt.detail.target = htmx.find("#main-cont"); // при клике по ссылке в цитате, т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится 
-
+        // при клике по ссылке в цитате, т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится 
+        if (evt.detail.boosted
+            && (evt.srcElement.offsetParent.firstChild.attributes && evt.srcElement.offsetParent.firstChild.getAttribute('id') === "quote-block"
+                || evt.detail.target.attributes && evt.detail.target.getAttribute('id') === "quote-block")
+        )
+            evt.detail.target = htmx.find("#main-cont");
+        else {
+            // это для ext, когда запрос выполняется не через htmx-триггер, а через htmx-ajax, т.е. результат возвращается не в defineExtension, а сюда в evt.detail.serverResponse
+            if (evt.detail.serverResponse !== undefined && evt.detail.serverResponse !== null && evt.detail.requestConfig.triggeringEvent === null) {
+                if (processJson(evt.detail.serverResponse) === "")
+                    evt.detail.shouldSwap = false; // вставили данные в функции processJson, поэтому их больше не надо вставлять
+            }
+        }
+    }
 });
 
 document.body.addEventListener('htmx:afterSwap', function (evt) {
@@ -390,47 +411,75 @@ function returnOriginalExtension(evt) {
 /* Плагин для HTMX - обработка JSON-данных, полученных с сервера */
 htmx.defineExtension('json-response', {
     transformResponse: function (text, xhr, elt) {
-        //var mustacheTemplate = htmx.closest(elt, '[mustache-template]')
-        var apiName = elt.getAttribute('id')
-        //debugger
-        if (apiName === 'api-ext') {
-            if (text[0] === "{") {
-                try {
-                    var data = JSON.parse(text)
-                    if (data) {
-                        for (var i = 0; i < data.length; i++) {
-                            var targetElt = htmx.find(data[i].target)
-                            if (targetElt) {
-                                targetElt.innerHTML = data[i].content;
+        if (xhr.status == 200) {
+            //var mustacheTemplate = htmx.closest(elt, '[mustache-template]')
+            var apiName = elt.getAttribute('id')
+            //debugger
+            if (apiName === 'api-ext') {
+                if (text[0] === "{" || text[0] === "[") {
+                    return processJson(text);
+                    /*try {
+                        var data = JSON.parse(text)
+                        if (data) {
+                            for (var i = 0; i < data.length; i++) {
+                                var targetElt = htmx.find(data[i].target)
+                                if (targetElt) {
+                                    targetElt.innerHTML = data[i].content;
 
-                                // для БВ очищаем подпись-ссылку на Послание
-                                if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
-                                    htmx.remove(htmx.find("#signature"));
-                                    /*var signature = htmx.find("#signature");
-                                    if (signature.parentNode) {
-                                        signature.parentNode.removeChild(signature);
-                                    }*/
-                                    //signature.remove();
+                                    // для БВ очищаем подпись-ссылку на Послание
+                                    if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
+                                        htmx.remove(htmx.find("#signature"));
+                                    }
+
+                                    htmx.process(targetElt); // "#quote-block" document.body
+                                    var a = 1;
                                 }
-
-                                htmx.process(/*"#quote-block"*/targetElt); // document.body
-                                var a = 1;
                             }
+                            return "";
+                        } else {
+                            throw new Error('С сервера пришли пустые данные')
                         }
-                        return "";
-                    } else {
-                        throw new Error('С сервера пришли пустые данные')
-                    }
-                } catch (e) {
-                    throw new Error(e.message)
+                    } catch (e) {
+                        throw new Error(e.message)
+                    }*/
                 }
+                else
+                    throw new Error('Неправильный формат данных (не json).')
             }
-            else
-                throw new Error('Неправильный формат данных (не json).')
         }
+        else
+            return ""; //throw new Error('Данные не найдены!'); // 
     }
 })
 
+function processJson(text) {
+    if (text[0] === "{" || text[0] === "[") {
+        try {
+            var data = JSON.parse(text)
+            if (data) {
+                for (var i = 0; i < data.length; i++) {
+                    var targetElt = htmx.find(data[i].target)
+                    if (targetElt) {
+                        targetElt.innerHTML = data[i].content;
+
+                        // для БВ очищаем подпись-ссылку на Послание
+                        if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
+                            htmx.remove(htmx.find("#signature"));
+                        }
+
+                        htmx.process(/*"#quote-block"*/targetElt); // document.body
+                        var a = 1;
+                    }
+                }
+                return "";
+            } else {
+                throw new Error('С сервера пришли пустые данные')
+            }
+        } catch (e) {
+            throw new Error(e.message)
+        }
+    }
+}
 
 
 
@@ -444,24 +493,23 @@ function callTriggerExt() {
 }
 
 // дополнительные запросы всегда выполняются не к домену по умолчанию (т.е. на котором открыт сайт), а к доп. хостам (для автономного режима всегда есть доп. хост)
-function reCallRequest(evt) {
+function reCallRequest(evt, withoutBase) {
     if (hostname !== "") {
         //var url = new URL(evt.detail.pathInfo.requestPath, evt.detail.pathInfo.requestPath.indexOf('http') !== -1 ? '' : hostname);
-        let url = getURL(evt.detail.pathInfo.requestPath, hostname);
+        let url = getURL(evt.detail.pathInfo.requestPath, hostname, withoutBase);
         let path = (sendExtSPA && evt.detail.boosted && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === basePath ? "index" : "") + ".spa") : url.href;
         if (evt.srcElement["htmx-internal-data"].listenerInfos
             && evt.srcElement["htmx-internal-data"].listenerInfos.length > 0
             && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger // если элемент первоначально был вызван через триггер, то снова вызываем этот триггер
-            && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger.indexOf('msu-ext-') === 0) {
+            && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger.indexOf('msu-ext-') === 0
+        ) {
             callTriggerExt();
         }
-        else htmx.ajax('GET', path, { target: evt.detail.target.getAttribute('id')/*'#main-cont', swap: 'outerHTML'*/ }).then(
+        else htmx.ajax('GET', path, '#' + evt.detail.target.getAttribute('id')/*'#main-cont'*/).then(
             function (result) {
-                /* обработает успешное выполнение */
                 let a = 1;
             },
             function (error) {
-                /* обработает ошибку */
                 let a = 2;
             }
         ); // https://v1.htmx.org/api/#ajax
@@ -480,7 +528,7 @@ function callNewServer(evt) {
 
             isNewHost = false;
             for (var i = 0; i < urls.length; i++) {
-            
+
                 if (newHosts[urls[i]] === undefined && // этот хост мы ещё не пробовали
                     urls[i] !== location.origin &&  // нам не надо использовать хост, который совпадает с хостом из адресной строки браузера
                     (location.protocol !== "https:" ||
@@ -519,7 +567,7 @@ function callNewServer(evt) {
             returnOriginalHostname();
 
             //if (evt.detail.target.getAttribute('id') === "main-cont")
-                alert("Все сервера недоступны! Попробуйте снова, через некоторое время.");
+            alert("Все сервера недоступны! Попробуйте снова, через некоторое время.");
         }
     }
     else if (dnsLinks !== "" && !isReadDnsLinks)
@@ -541,15 +589,16 @@ function returnOriginalHostname() {
 /*  ----------  Хелперы  ------------  */
 
 
-function getURL(path, newHostname) {
-    let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (hostname === "" ? location.origin : hostname));
+function getURL(path, newHostname, withoutBase) {
+    let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (location.origin.indexOf('file://') === -1/*hostname === ""*/ ? location.origin : hostname));
 
     if (baseUrl === '') return new URL(path); //baseUrl = undefined;
     else {
-        if (path.indexOf('http') === -1) return new URL((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length - 1) : basePath) + path, baseUrl);
+        if (path.indexOf('http') === -1)
+            return new URL((withoutBase === true ? "" : ((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length - 1) : basePath))) + path, baseUrl);
 
-        let url = new URL((path.indexOf('/') === 0 ? basePath.substring(0, basePath.length - 1) : basePath) + path);
-        return new URL(url.pathname, baseUrl);
+        let url = new URL(path);
+        return new URL(withoutBase === true ? ((url.pathname.indexOf(basePath) === 0 ? url.pathname.substring(basePath.length - 1) : url.pathname)) : "", baseUrl);
     }
 }
 
@@ -737,11 +786,11 @@ if (navigator.userAgent.indexOf('MSIE') !== -1
 
             if (base !== undefined && base !== null) {
                 var protocol = base.split('//')[0],
-                comps2 = base.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
-                host = comps2[0],
-                tmp = host.split(':'),
-                port = tmp[1],
-                hostname = tmp[0];
+                    comps2 = base.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
+                    host = comps2[0],
+                    tmp = host.split(':'),
+                    port = tmp[1],
+                    hostname = tmp[0];
             }
 
             search = typeof search !== 'undefined' ? '?' + search : '';
