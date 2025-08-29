@@ -51,6 +51,9 @@ document.querySelector('body').style.setProperty("--body-background", "url('" + 
 
 /*window.onload = */function startOnLoad() {
 
+    var nonext = localStorage.getItem('nonext');
+    EnableDisableNonext(JSON.parse(nonext));
+
     let url_ = new URL(document.baseURI);
     basePath = url_.protocol === "file:" ? "/" : url_.pathname;
     /*let baseUrl = document.baseURI;
@@ -153,6 +156,29 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
     }
     else if (isAutonomy())
         htmx.trigger('#main-cont', triggerOnload, { detail: true });
+}
+
+
+// вкл/откл. показ перехода к будущей последней странице Катрена при её текущем отсутствии
+var styleDyn = document.createElement('style');
+document.head.appendChild(styleDyn);
+function EnableDisableNonext(isEnableNonext) {
+    if (isEnableNonext === true) {
+        localStorage.setItem('nonext', true);
+        styleDyn.innerHTML = `
+            .nonext {
+                display: inline;
+            }
+        `
+    }
+    else if (isEnableNonext === false) {
+        localStorage.setItem('nonext', false);
+        styleDyn.innerHTML = `
+            .nonext {
+                display: none;
+            }
+        `
+    }
 }
 
 
