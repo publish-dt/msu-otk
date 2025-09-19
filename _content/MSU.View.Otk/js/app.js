@@ -30,15 +30,16 @@ isIE = false;
 triggerOnload = "msu-on-get-dns";
 isReadDnsLinks = false; // dnsLinks получен
 basePath = '';
+//MSUDATA_TAG_REGEX = msuMakeTagRegEx('msu-data');
 
-htmx.config.timeout = 10000; // (милисекунды) максимальное время ожидания результата запроса
-
-
-
-/*document.querySelector('.header').style.setProperty("--header-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/header.jpg')");
-document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/stars.gif')");*/
+htmx.config.timeout = 15000; // (милисекунды) максимальное время ожидания результата запроса (15 сек., т.к. очень долго может выполняться запрос к S3)
 
 
+
+/*document.querySelector('.header').style.setProperty("--header-background", "url('" + StaticResourcesHost + "/_content/msu.view.otk/img/header.jpg')");
+document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/msu.view.otk/img/stars.gif')");*/
+
+document.baseURI = getBaseURI();
 
 
 /*  -------------  Функции первоначальной загрузки  -------------  */
@@ -165,19 +166,11 @@ document.head.appendChild(styleDyn);
 function EnableDisableNonext(isEnableNonext) {
     if (isEnableNonext === true) {
         localStorage.setItem('nonext', true);
-        styleDyn.innerHTML = `
-            .nonext {
-                display: inline;
-            }
-        `
+        styleDyn.innerHTML = '.nonext { display: inline; }';
     }
     else if (isEnableNonext === false) {
         localStorage.setItem('nonext', false);
-        styleDyn.innerHTML = `
-            .nonext {
-                display: none;
-            }
-        `
+        styleDyn.innerHTML = '.nonext { display: none; }';
     }
 }
 
@@ -198,18 +191,21 @@ function hiddenTooltip(el) {
 function clearTooltip() {
 
     let listTimeoutID = [];
-    Array.prototype.slice.call(document.querySelectorAll('.hint--left')).forEach(function (box) {
+    Array.prototype.slice.call(document.querySelectorAll('.poem')).forEach(function (box) { // hint--left
         return box.addEventListener('mouseenter', function (event) {
-            event.target.style.setProperty("--visibility", "visible");
+            //event.target.style.setProperty("--visibility", "visible");
+
             timeoutID = window.setTimeout(hiddenTooltip, 1500, event.target);
             listTimeoutID.push([event.target, timeoutID]);
         });
     }
     );
-    Array.prototype.slice.call(document.querySelectorAll('.hint--left')).forEach(function (box) {
+    Array.prototype.slice.call(document.querySelectorAll('.poem')).forEach(function (box) { // hint--left
         return box.addEventListener('mouseleave', function (event) {
             for (let i = 0; i < listTimeoutID.length; i++) {
                 if (listTimeoutID[i][0] === event.target) {
+                    event.target.style.removeProperty("--visibility");
+
                     window.clearTimeout(listTimeoutID[i][1]);
                     listTimeoutID.splice(i, 1);
                     //console.log(listTimeoutID.length);
@@ -423,12 +419,33 @@ document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
     //returnOriginalExtension(evt);
 });
 
+// событие: произошол превышение времени ожидания ответа при запросе через htmx
+document.body.addEventListener('htmx:timeout', function (evt) {
+    const url = getURL(evt.detail.pathInfo.finalRequestPath); // new URL
+    badHosts[url.origin] = true;
+    callNewServer(evt);
+    //returnOriginalExtension(evt);
+});
+
 // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
 function returnOriginalExtension(evt) {
     if (evt.detail.boosted && evt.detail.requestConfig.elt.localName == 'a') { // evt.detail.elt.localName
-        const url = getURL(evt.detail.requestConfig.elt.href); // evt.detail.elt.href // new URL
+        var path = "";
+        var msuData = undefined;
 
-        evt.detail.history.path = url.pathname;
+        // извлекаем из полученного контента ссылку на последнюю страницу
+        if (evt.detail.xhr.response !== "")
+            msuData = evt.detail.xhr.response.match(new RegExp('<msu-data\\spathToUrl="(.+)"><\\/msu-data>', 'im'));
+        if (msuData) {
+            var ext = evt.detail.requestConfig.elt.href.split('.').pop();
+            path = '/' + msuData[1] + (ext ? ('.' + ext) : "");
+        }
+        else {
+            const url = getURL(evt.detail.requestConfig.elt.href); // evt.detail.elt.href // new URL
+            path = url.pathname;
+        }
+
+        evt.detail.history.path = path;
         /*evt.detail.pathInfo.responsePath = url.pathname;
         evt.detail.requestConfig.path = url.pathname;*/
     }
@@ -617,6 +634,7 @@ function returnOriginalHostname() {
 
 function getURL(path, newHostname, withoutBase) {
     let baseUrl = newHostname !== undefined ? newHostname : (path.indexOf('http') !== -1 ? '' : (location.origin.indexOf('file://') === -1/*hostname === ""*/ ? location.origin : hostname));
+    //path = path.toLowerCase();
 
     if (baseUrl === '') return new URL(path); //baseUrl = undefined;
     else {
@@ -649,6 +667,23 @@ function isExtRequest() {
 
 function isQuoteRequest() {
     return isQuoteRequestVal;
+}
+
+function getBaseURI() {
+    if (document.baseURI) return document.baseURI;
+    const base = document.getElementsByTagName('base');
+    if (base.length > 0) return base[0].href;
+    return document.URL;
+}
+
+/**
+* @param {string} tag
+* @param {boolean} [global]
+* @returns {RegExp}
+*/
+function msuMakeTagRegEx(tag, global) {
+    return new RegExp('<' + tag + '(\\s[^>]*>|>)([\\s\\S]*?)<\\/' + tag + '>',
+        !!global ? 'gim' : 'im')
 }
 
 // С пом. этой функции можно много раз подключать обработчик window.onload (по умолчанию можно отолько один раз подключить, все остальные разы затираются)
@@ -799,59 +834,61 @@ if (navigator.userAgent.indexOf('MSIE') !== -1
     // ES5
     if (typeof window.URL !== 'function') {
         window.URL = function (url, base) {
-            let ind = url.indexOf('http') === 0 ? 1 : 0;
-            if (url.indexOf('/') === 0) url = url.substring(1);
+            if (url !== undefined) {
+                var ind = url.indexOf('http') === 0 ? 1 : 0;
+                if (url.indexOf('/') === 0) url = url.substring(1);
 
-            var protocol = ind === 0 ? '' : url.split('//')[0],
-                comps = url.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
-                host = ind === 0 ? '' : comps[0],
-                search = comps[comps.length - 1].split('?')[1],
-                tmp = host.split(':'),
-                port = ind === 0 ? '' : tmp[1],
-                hostname = ind === 0 ? '' : tmp[0];
-
-            if (base !== undefined && base !== null) {
-                var protocol = base.split('//')[0],
-                    comps2 = base.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
-                    host = comps2[0],
+                var protocol = ind === 0 ? '' : url.split('//')[0],
+                    comps = url.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
+                    host = ind === 0 ? '' : comps[0],
+                    search = comps[comps.length - 1].split('?')[1],
                     tmp = host.split(':'),
-                    port = tmp[1],
-                    hostname = tmp[0];
-            }
+                    port = ind === 0 ? '' : tmp[1],
+                    hostname = ind === 0 ? '' : tmp[0];
 
-            search = typeof search !== 'undefined' ? '?' + search : '';
-
-            var params = [];
-            //// выдаёт ошибку, поэтому закомментировано
-            //if (search !== "") {
-            //    params = search
-            //        .slice(1)
-            //        .split('&')
-            //        .map(function (p) { return p.split('='); })
-            //        .reduce(function (p, c) {
-            //            var parts = c.split('=', 2).map(function (param) { return decodeURIComponent(param); });
-            //            if (parts.length == 0 || parts[0] != param) return (p instanceof Array) && !asArray ? null : p;
-            //            return asArray ? p.concat(parts.concat(true)[1]) : parts.concat(true)[1];
-            //        }, []);
-            //}
-
-            return {
-                hash: url.indexOf('#') > -1 ? url.substring(url.indexOf('#')) : '',
-                protocol: protocol,
-                host: host,
-                hostname: hostname,
-                href: (protocol !== "" ? (protocol + '//' + host) : "") + "/" + url,
-                pathname: '/' + comps.splice(ind).map(function (o) { return /\?/.test(o) ? o.split('?')[0] : o; }).join('/'),
-                search: search,
-                origin: protocol !== "" ? (protocol + '//' + host) : "",
-                port: typeof port !== 'undefined' ? port : '',
-                searchParams: {
-                    get: function (p) {
-                        return p in params ? params[p] : ''
-                    },
-                    getAll: function () { return params; }
+                if (base !== undefined && base !== null) {
+                    var protocol = base.split('//')[0],
+                        comps2 = base.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
+                        host = comps2[0],
+                        tmp = host.split(':'),
+                        port = tmp[1],
+                        hostname = tmp[0];
                 }
-            };
+
+                search = typeof search !== 'undefined' ? '?' + search : '';
+
+                var params = [];
+                //// выдаёт ошибку, поэтому закомментировано
+                //if (search !== "") {
+                //    params = search
+                //        .slice(1)
+                //        .split('&')
+                //        .map(function (p) { return p.split('='); })
+                //        .reduce(function (p, c) {
+                //            var parts = c.split('=', 2).map(function (param) { return decodeURIComponent(param); });
+                //            if (parts.length == 0 || parts[0] != param) return (p instanceof Array) && !asArray ? null : p;
+                //            return asArray ? p.concat(parts.concat(true)[1]) : parts.concat(true)[1];
+                //        }, []);
+                //}
+
+                return {
+                    hash: url.indexOf('#') > -1 ? url.substring(url.indexOf('#')) : '',
+                    protocol: protocol,
+                    host: host,
+                    hostname: hostname,
+                    href: (protocol !== "" ? (protocol + '//' + host) : "") + "/" + url,
+                    pathname: '/' + comps.splice(ind).map(function (o) { return /\?/.test(o) ? o.split('?')[0] : o; }).join('/'),
+                    search: search,
+                    origin: protocol !== "" ? (protocol + '//' + host) : "",
+                    port: typeof port !== 'undefined' ? port : '',
+                    searchParams: {
+                        get: function (p) {
+                            return p in params ? params[p] : ''
+                        },
+                        getAll: function () { return params; }
+                    }
+                };
+            }
         }
     }
     /* Polyfill IE 11 end */

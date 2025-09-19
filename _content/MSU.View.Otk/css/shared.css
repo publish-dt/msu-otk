@@ -1,6 +1,6 @@
-﻿
+
 /* нумерация четверостиший Катренов */
-.hint--left:after, .hint--left:before {
+/*.hint--left:after, .hint--left:before {
     right: 99%;
     bottom: 112%;
 }
@@ -18,12 +18,17 @@
     padding: 4px 2px;
     font-size: 1.5rem;
 }
-.poem::before {
-    content: attr(aria-label);
-    position: absolute;
-    /*left: -10px;*/
-}
 
 [class*=hint--]:hover:before, [class*=hint--]:hover:after {
     visibility: var(--visibility, visible);
+}*/
+
+
+.poem:hover:before {
+    visibility: var(--visibility, visible);
+}
+
+.poem::before {
+    content: attr(aria-label);
+    position: absolute;
 }

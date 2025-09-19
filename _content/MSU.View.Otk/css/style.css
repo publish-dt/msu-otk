@@ -874,10 +874,10 @@ p.c0 {
 		display: block;
 		text-align: left;
   }
-  .post-link{
+	.post-link {
 		display: block;
-		text-align: left;
-  }  
+		text-align: right;
+	}  
 }
 
 /*-----------------------------------------------------*/
@@ -1608,3 +1608,14 @@ SPAN.c2, SPAN.c3, SPAN.c4, SPAN.c5 {
 	.btn-link:focus {
 		color: #FFFFFF;
 	}
+
+
+
+/* нумерация четверостиший Катренов */
+.poem:before {
+	visibility: var(--visibility, hidden);
+}
+.poem::before {
+	left: 8px;
+	margin-top: -19px;
+}

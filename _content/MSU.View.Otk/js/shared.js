@@ -1,4 +1,4 @@
-﻿function tooltipstering(isPrint/* = false*/) {
+function tooltipstering(isPrint/* = false*/) {
     if (isPrint === undefined) isPrint = false;
 
     let counterNumbPoem = 1;
@@ -11,11 +11,11 @@
 
         if (element.className.toLowerCase() === "page-title" || element.className.toLowerCase() === "next") counterNumbPoem = 1;
         if (element.classList.contains("poem")) {
-            if (!isPrint) {
+            /*if (!isPrint) {
                 element.classList.add('hint--left');
                 element.classList.add('hint--no-arrow');
                 element.classList.add('hint--no-animate');
-            }
+            }*/
 
             element.setAttribute('aria-label', counterNumbPoem);
 
