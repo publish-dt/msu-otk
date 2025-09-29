@@ -28,6 +28,11 @@
     visibility: var(--visibility, visible);
 }
 
+/* IE11 */
+*::-ms-backdrop, .poem:hover:before {
+    visibility: visible;
+}
+
 .poem::before {
     content: attr(aria-label);
     position: absolute;

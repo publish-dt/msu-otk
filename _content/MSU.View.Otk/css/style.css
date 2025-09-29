@@ -670,18 +670,14 @@ td{
 	display: none;
 }
 .select-poslan{
+	float:right;
 	margin-top:5px;
 }
-.select-year{
-	float:right;
-}
 .select-month{
-	float:right; 
 	margin-right:5px;	
 }
 /*Перейти к месяцу и году Послания*/
 .goto{
-	float:right; 
 	text-align: right; 
 	padding-right:5px;
 }
@@ -1615,6 +1611,12 @@ SPAN.c2, SPAN.c3, SPAN.c4, SPAN.c5 {
 .poem:before {
 	visibility: var(--visibility, hidden);
 }
+
+/* IE11 */
+*::-ms-backdrop, .poem:before {
+	visibility: hidden;
+}
+
 .poem::before {
 	left: 8px;
 	margin-top: -19px;

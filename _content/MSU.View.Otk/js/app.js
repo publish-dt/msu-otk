@@ -1,4 +1,4 @@
-// let удалено (у тех, которые ещё раз присваиваются, т.к. ошибка возникает, когда через историю браузера возвращаемся назад, при этом заново загружается из кэша app.js и заново инициализируется, хотя он уже был ранее инициализирован (при первой загрузке страницы)
+// let удалено (у тех, которые ещё раз присваиваются, т.к. ошибка возникает, когда через историю браузера возвращаемся назад, при этом заново загружается из кэша app.js и заново инициализируется, хотя он уже был ранее инициализирован (при первой загрузке страницы), и startOnLoad() уже не срабатывает
 domain = "";
 hostname = typeof hostname !== 'undefined' && hostname !== "" ? hostname : "";
 dnsLinks = typeof dnsLinks !== 'undefined' && dnsLinks !== "" ? dnsLinks : ""; // dnslink.msu.linkpc.net // если пусто, то не пытаемся подключиться к другим хостам
@@ -16,8 +16,9 @@ originalHostname = hostname; // запоминаем изначальный хо
 
 
 
-isQuoteRequestVal = false;
-isExtRequestVal = true;
+isQuoteRequestVal = false; // получать цитату отдельным запросом
+isCldRequestVal = false; // получать данные календаря отдельным запросом (может быть закэширован в отдельный файл)
+isExtRequestVal = true; // получать различные динамические данные одним запросом (не кэшируется этот запрос/данные)
 
 urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
 newHosts = {}; // список новых/дополнительных хостов (т.к. текущий недоступен). Это не полный список, а только те, к которым уже был выполнен запрос, т.е уже знаем рабочий этот хост или недоступный
@@ -30,6 +31,8 @@ isIE = false;
 triggerOnload = "msu-on-get-dns";
 isReadDnsLinks = false; // dnsLinks получен
 basePath = '';
+minCldYear = 2016;
+maxCldYear = new Date().getFullYear();
 //MSUDATA_TAG_REGEX = msuMakeTagRegEx('msu-data');
 
 htmx.config.timeout = 15000; // (милисекунды) максимальное время ожидания результата запроса (15 сек., т.к. очень долго может выполняться запрос к S3)
@@ -40,6 +43,7 @@ htmx.config.timeout = 15000; // (милисекунды) максимально�
 document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/msu.view.otk/img/stars.gif')");*/
 
 document.baseURI = getBaseURI();
+basePath = getBasePath(); // этот код нельзя ставить в startOnLoad(), т.к. при возврате кнопкой браузере "Назад" startOnLoad() не срабатывает - см. первый комментарий в этом файле
 
 
 /*  -------------  Функции первоначальной загрузки  -------------  */
@@ -50,17 +54,22 @@ document.baseURI = getBaseURI();
     if (isAlert) alert(message + "\n В " + line + ":" + col + " на " + url);
 };*/
 
-/*window.onload = */function startOnLoad() {
+/*window.onload = function startWinOnLoad() {
+    debugger;
+}*/
+
+function startOnLoad() {
+
+    var eventsCld = [];
+    var settings = { };
+    var element = document.getElementById('caleandar');
+    caleandar(element, eventsCld, settings); // , newDateCld
 
     var nonext = localStorage.getItem('nonext');
     EnableDisableNonext(JSON.parse(nonext));
 
-    let url_ = new URL(document.baseURI);
-    basePath = url_.protocol === "file:" ? "/" : url_.pathname;
-    /*let baseUrl = document.baseURI;
-    baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-    let arrLen = baseUrl.split('/');
-    basePath = '/' + arrLen[arrLen.length - 1] + '/';*/
+    /*let url_ = new URL(document.baseURI);
+    basePath = url_.protocol === "file:" ? "/" : url_.pathname;*/
 
     getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
@@ -339,16 +348,18 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     }
 
     let url = getURL(path);
+
+    // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
+    if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
+        callTriggerExt(url);
+
     detail.path = (sendExtSPA
         && (detail.boosted
             || (detail.triggeringEvent !== undefined && evt.detail.triggeringEvent !== null && detail.triggeringEvent.type === triggerOnload))
         && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === basePath ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
 
-    // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
-    if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
-        callTriggerExt();
-    /*if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
-    else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""*/
+    if (detail.triggeringEvent && detail.triggeringEvent.detail.toEndPath)
+        detail.path = detail.path.substring(0, detail.path.lastIndexOf('/')+1) + detail.triggeringEvent.detail.toEndPath;
 
     if (isAlert) alert("hostname = " + hostname);
 });
@@ -458,40 +469,21 @@ htmx.defineExtension('json-response', {
             //var mustacheTemplate = htmx.closest(elt, '[mustache-template]')
             var apiName = elt.getAttribute('id')
             //debugger
-            if (apiName === 'api-ext') {
-                if (text[0] === "{" || text[0] === "[") {
+            if (text[0] === "{" || text[0] === "[") {
+                if (apiName === 'api-ext-data') {
                     return processJson(text);
-                    /*try {
-                        var data = JSON.parse(text)
-                        if (data) {
-                            for (var i = 0; i < data.length; i++) {
-                                var targetElt = htmx.find(data[i].target)
-                                if (targetElt) {
-                                    targetElt.innerHTML = data[i].content;
-
-                                    // для БВ очищаем подпись-ссылку на Послание
-                                    if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
-                                        htmx.remove(htmx.find("#signature"));
-                                    }
-
-                                    htmx.process(targetElt); // "#quote-block" document.body
-                                    var a = 1;
-                                }
-                            }
-                            return "";
-                        } else {
-                            throw new Error('С сервера пришли пустые данные')
-                        }
-                    } catch (e) {
-                        throw new Error(e.message)
-                    }*/
                 }
-                else
-                    throw new Error('Неправильный формат данных (не json).')
+                else if (apiName === 'api-ext-cld') {
+                    /*var dateArr = elt["htmx-internal-data"].path.split(/\/.*\/(\d{4})-(\d{1,2}).json/);
+                    if (dateArr.length > 3)*/
+                        return processJsonCld(text/*, new Date(parseInt(dateArr[1]), parseInt(dateArr[2]) - 1, 1)*/);
+                }
             }
+            else
+                throw new Error('Неправильный формат данных (не json).')
         }
-        else
-            return ""; //throw new Error('Данные не найдены!'); // 
+
+        return ""; //throw new Error('Данные не найдены!'); // 
     }
 })
 
@@ -501,17 +493,22 @@ function processJson(text) {
             var data = JSON.parse(text)
             if (data) {
                 for (var i = 0; i < data.length; i++) {
-                    var targetElt = htmx.find(data[i].target)
-                    if (targetElt) {
-                        targetElt.innerHTML = data[i].content;
+                    if (data[i].target) {
+                        var targetElt = htmx.find(data[i].target)
+                        if (targetElt) {
+                            targetElt.innerHTML = data[i].content;
 
-                        // для БВ очищаем подпись-ссылку на Послание
-                        if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
-                            htmx.remove(htmx.find("#signature"));
+                            // для БВ очищаем подпись-ссылку на Послание
+                            if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
+                                htmx.remove(htmx.find("#signature"));
+                            }
+
+                            htmx.process(/*"#quote-block"*/targetElt); // document.body
+                            var a = 1;
                         }
-
-                        htmx.process(/*"#quote-block"*/targetElt); // document.body
-                        var a = 1;
+                    }
+                    else if (data[i].json === "calendar") {
+                        processJsonCld(data[i].content);
                     }
                 }
                 return "";
@@ -527,12 +524,195 @@ function processJson(text) {
 
 
 
+/* -----------  Работа с календарём  ------------ */
+
+function processJsonCld(text/*, newDate*/) {
+    var daysData = [];
+    var month = undefined;
+    var year = undefined;
+
+    if (text[0] === "{" || text[0] === "[") {
+        try {
+            data = JSON.parse(text)
+            if (data) {
+                month = data.Month;
+                year = data.Year;
+                minCldYear = data.MinYear;
+                daysData = data.DaysData;
+            } else {
+                throw new Error('С сервера пришли пустые данные')
+            }
+        } catch (e) {
+            throw new Error(e.message)
+        }
+    }
+
+    if (month + 1 && year) {
+        var newDate = new Date(year, month-1);
+
+        var element = document.getElementById('caleandar');
+        element.innerHTML = '';
+
+        caleandar(element, daysData, {}, newDate);
+
+        // заполнение списка годов для поля выбора (под календарём)
+        var selectYear = document.getElementById('cldYear');
+        for (i = minCldYear - 2004; i <= maxCldYear - 2004; i += 1) {
+            option = document.createElement('option');
+            option.value = 2004 + i;
+            option.text = 2004 + i;
+            selectYear.add(option);
+        }
+        selectYear.value = -1;
+
+        var selectMonth = document.getElementById('cldMonth');
+        selectMonth.value = -1;
+    }
+
+    return "";
+}
+
+function onChangeCld(adjuster) {
+    /*var eltMonth = document.getElementById('cldMonth');
+    var month = parseInt(eltMonth.value) - 1;
+
+    var eltYear = document.getElementById('cldYear');
+    var year = parseInt(eltYear.value);*/
+
+    var date = new Date(curCldYear/*year*/, curCldMonth/*month*/ + adjuster - 1, 1);
+    curCldMonth/*month*/ = date.getMonth();
+    /*year*/curCldYear = date.getFullYear();
+
+    var yearExist = false;
+    if (curCldYear >= minCldYear && curCldYear <= new Date().getFullYear())
+        yearExist = true;
+    /*for (var i = 0; i < eltYear.options.length; i++) {
+        if (eltYear.options[i].value == year) {
+            yearExist = true;
+            break;
+        }
+    }*/
+    if (yearExist) { // проверяем, можно ли стрелками месяца перейти к след./пред. году, поскольку список годов ограничен
+        /*eltMonth.value = month + 1;
+        eltYear.value = year;*/
+
+        changeCalendar(curCldMonth/*month*/ + 1, curCldYear/*year*/);
+    }
+}
+
+function onChangeMonth(month) {
+    var year = parseInt(document.getElementById('cldYear').value);
+    if (year !== -1) changeCalendar(parseInt(month), year);
+}
+
+function onChangeYear(year) {
+    var month = parseInt(document.getElementById('cldMonth').value);
+    if (month !== -1) changeCalendar(month, parseInt(year));
+}
+
+function changeCalendar(month, year) {
+    curCldMonth = month;
+    curCldYear = year;
+    var cldTitle = document.getElementById('cldTitle');
+    if (cldTitle) cldTitle.innerHTML = months[month - 1] + " " + year;
+    GetDataAjax(year + "-" + month + ".json");
+}
+
+function GetDataAjax(path/*, year, month*/) {
+    let url = getURL("/ext/cld/");
+    htmx.ajax('GET', url.href + path, { handler: handlerCld/*, values: { "year": year, "month": month }*/ }).then(
+        function (result) {
+            let a = 1;
+            //debugger
+        },
+        function (error) {
+            let a = 2;
+            //debugger
+        }
+    );
+}
+
+function handlerCld(elt, detail/*, year, month*/) {
+    var text = detail.xhr.response;
+    /*var dateArr = detail.pathInfo.responsePath.split(/\/.*\/(\d{4})-(\d{1,2}).json/);
+    var month = parseInt(dateArr[2]-1);
+    var year = parseInt(dateArr[1]);
+
+    var eltTitle = document.getElementById('cldTitle');
+    var eltMonth = document.getElementById('cldMonth');
+    if (month+1 && year) {
+        eltTitle.innerHTML = eltMonth.options[month].text + " " + year;
+
+        processJsonCld(text, new Date(year, month, 1));
+    }*/
+    processJsonCld(text);
+}
+
+function getDateFromPath(path) {
+    if (path === basePath)
+        return null;
+    else {
+        var dateArr = path.split(/.*?\/(\d{2}).(\d{2}).(\d{2}).html/);
+        if (dateArr.length > 1) {
+            var year = parseInt(dateArr[3]);
+            var month = parseInt(dateArr[2]);
+            var day = parseInt(dateArr[1]);
+            return new Date(2000+year, month-1, day);
+        }
+        else {
+            var dateArr2 = path.split(/.*?\/(\d{4})-(\d{2})-(\d{2})/);
+            if (dateArr.length > 1) {
+                var year = parseInt(dateArr2[1]);
+                var month = parseInt(dateArr2[2]);
+                var day = parseInt(dateArr[3]);
+                return new Date(year, month-1, day);
+            }
+            else
+                return null; // -next тоже должна сюда попасть, т.к. следующий материал уже может быть в следующем месяце, а дата здесь будет ещё предыдущего месяца
+        }
+    }
+}
+
+
+
 /* -----------  Работа с повторными отправками запросов на другие хосты  ------------ */
 
 
-function callTriggerExt() {
-    if (isExtRequestVal) htmx.trigger("#api-ext", "msu-ext-data"); // вместо "click from:a""
+function callTriggerExt(url) {
+    if (isExtRequestVal) {
+        var date = getDateFromPath(url.pathname);
+        htmx.trigger("#api-ext-data", "msu-ext-data", { toEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last" }); // вместо "click from:a""
+    }
     else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
+
+    // API-запрос данных календаря
+    if (true) { // при манипуляциях с элементами управления календаря (стрелки влево/вправо и поля под календарём) всегда идёт выполнение отдельного запроса api-ext-cld
+        var path = '';
+        if (url.pathname === basePath)
+            path = 'last';
+        else {
+            var dateArr = url.pathname.split(/.*?\/\d{2}.(\d{2}).(\d{2}).html/);
+            if (dateArr.length > 1) {
+                var year = parseInt(dateArr[2]);
+                var month = parseInt(dateArr[1]);
+                path = '20' + year + '-' + month;
+            }
+            else {
+                var dateArr2 = url.pathname.split(/.*?\/(\d{4})-(\d{2})-\d{2}/);
+                if (dateArr.length > 1) {
+                    var year = parseInt(dateArr2[1]);
+                    var month = parseInt(dateArr2[2]);
+                    path = year + '-' + month;
+                }
+                else
+                    path = 'last'; // -next тоже должна сюда попасть, т.к. следующий материал уже может быть в следующем месяце, а дата здесь будет ещё предыдущего месяца
+            }
+        }
+        var elCld = htmx.find("#api-ext-cld");
+        var apiPath = elCld.attributes['hx-get'].value;
+        elCld.attributes['hx-get'].value = apiPath.replace(/(ext\/cld\/).*?(\.json)/, "$1" + path + "$2");
+        htmx.process(elCld); // это так же выполняет htmx.trigger("#api-ext-cld", "msu-ext-cld");
+    }
 }
 
 // дополнительные запросы всегда выполняются не к домену по умолчанию (т.е. на котором открыт сайт), а к доп. хостам (для автономного режима всегда есть доп. хост)
@@ -669,11 +849,21 @@ function isQuoteRequest() {
     return isQuoteRequestVal;
 }
 
+function isCldRequestOnLoad() {
+    return isCldRequestVal;
+}
+
+
 function getBaseURI() {
     if (document.baseURI) return document.baseURI;
     const base = document.getElementsByTagName('base');
     if (base.length > 0) return base[0].href;
     return document.URL;
+}
+
+function getBasePath() {
+    let url_ = new URL(document.baseURI);
+    return url_.protocol === "file:" ? "/" : url_.pathname;
 }
 
 /**
