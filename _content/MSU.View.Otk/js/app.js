@@ -43,7 +43,7 @@ htmx.config.timeout = 15000; // (милисекунды) максимально�
 document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/msu.view.otk/img/stars.gif')");*/
 
 document.baseURI = getBaseURI();
-basePath = getBasePath(); // этот код нельзя ставить в startOnLoad(), т.к. при возврате кнопкой браузере "Назад" startOnLoad() не срабатывает - см. первый комментарий в этом файле
+//basePath = getBasePath(); этот код перенесён в самый низ, т.к. в IE11 сначала должна инициализироваться функция window.URL = function (которая используется в getBasePath())
 
 
 /*  -------------  Функции первоначальной загрузки  -------------  */
@@ -358,8 +358,14 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
             || (detail.triggeringEvent !== undefined && evt.detail.triggeringEvent !== null && detail.triggeringEvent.type === triggerOnload))
         && url.href.indexOf('.spa') === -1) ? (url.href.replace(".html", '') + (url.pathname === basePath ? "index" : "") + ".spa") : url.href; // подставляем .spa, при необходимости
 
-    if (detail.triggeringEvent && detail.triggeringEvent.detail.toEndPath)
-        detail.path = detail.path.substring(0, detail.path.lastIndexOf('/')+1) + detail.triggeringEvent.detail.toEndPath;
+    if (detail.triggeringEvent && detail.triggeringEvent.detail.replaceEndPath)
+        detail.path = detail.path.substring(0, detail.path.lastIndexOf('/') + 1) + detail.triggeringEvent.detail.replaceEndPath;
+
+    if (detail.triggeringEvent && detail.triggeringEvent.detail.headers) {
+        for (let header in detail.triggeringEvent.detail.headers) {
+            detail.headers[header] = detail.triggeringEvent.detail.headers[header];
+        }
+    }
 
     if (isAlert) alert("hostname = " + hostname);
 });
@@ -493,13 +499,13 @@ function processJson(text) {
             var data = JSON.parse(text)
             if (data) {
                 for (var i = 0; i < data.length; i++) {
-                    if (data[i].target) {
-                        var targetElt = htmx.find(data[i].target)
+                    if (data[i].targetElt) {
+                        var targetElt = htmx.find(data[i].targetElt)
                         if (targetElt) {
                             targetElt.innerHTML = data[i].content;
 
                             // для БВ очищаем подпись-ссылку на Послание
-                            if (data[i].target === "#quote-block" && siteID.indexOf("OTK") !== 0) {
+                            if (data[i].targetElt === "#quote-block" && siteID.indexOf("OTK") !== 0) {
                                 htmx.remove(htmx.find("#signature"));
                             }
 
@@ -507,7 +513,7 @@ function processJson(text) {
                             var a = 1;
                         }
                     }
-                    else if (data[i].json === "calendar") {
+                    else if (data[i].targetJson === "calendar") {
                         processJsonCld(data[i].content);
                     }
                 }
@@ -548,20 +554,28 @@ function processJsonCld(text/*, newDate*/) {
     }
 
     if (month + 1 && year) {
+        curCldMonth = month;
+        curCldYear = year;
+
         var newDate = new Date(year, month-1);
+
+        var cldTitle = document.getElementById('cldTitle');
+        if (cldTitle) cldTitle.innerHTML = months[month - 1] + " " + year;
 
         var element = document.getElementById('caleandar');
         element.innerHTML = '';
 
         caleandar(element, daysData, {}, newDate);
 
-        // заполнение списка годов для поля выбора (под календарём)
+        // заполнение списка годов в поле выбора (под календарём)
         var selectYear = document.getElementById('cldYear');
-        for (i = minCldYear - 2004; i <= maxCldYear - 2004; i += 1) {
-            option = document.createElement('option');
-            option.value = 2004 + i;
-            option.text = 2004 + i;
-            selectYear.add(option);
+        if (selectYear.options.length === 1) {
+            for (i = minCldYear - 2004; i <= maxCldYear - 2004; i += 1) {
+                option = document.createElement('option');
+                option.value = 2004 + i;
+                option.text = 2004 + i;
+                selectYear.add(option);
+            }
         }
         selectYear.value = -1;
 
@@ -580,23 +594,12 @@ function onChangeCld(adjuster) {
     var year = parseInt(eltYear.value);*/
 
     var date = new Date(curCldYear/*year*/, curCldMonth/*month*/ + adjuster - 1, 1);
-    curCldMonth/*month*/ = date.getMonth();
-    /*year*/curCldYear = date.getFullYear();
+    var month/*curCldMonth*/ = date.getMonth();
+    var year/*curCldYear*/ = date.getFullYear();
 
     var yearExist = false;
-    if (curCldYear >= minCldYear && curCldYear <= new Date().getFullYear())
-        yearExist = true;
-    /*for (var i = 0; i < eltYear.options.length; i++) {
-        if (eltYear.options[i].value == year) {
-            yearExist = true;
-            break;
-        }
-    }*/
-    if (yearExist) { // проверяем, можно ли стрелками месяца перейти к след./пред. году, поскольку список годов ограничен
-        /*eltMonth.value = month + 1;
-        eltYear.value = year;*/
-
-        changeCalendar(curCldMonth/*month*/ + 1, curCldYear/*year*/);
+    if (year/*curCldYear*/ >= minCldYear && year/*curCldYear*/ <= new Date().getFullYear()) { // проверяем, можно ли стрелками месяца перейти к след./пред. году, поскольку список годов ограничен
+        changeCalendar(month/*curCldMonth*/ + 1, year/*curCldYear*/);
     }
 }
 
@@ -611,10 +614,8 @@ function onChangeYear(year) {
 }
 
 function changeCalendar(month, year) {
-    curCldMonth = month;
-    curCldYear = year;
-    var cldTitle = document.getElementById('cldTitle');
-    if (cldTitle) cldTitle.innerHTML = months[month - 1] + " " + year;
+    /*curCldMonth = month;
+    curCldYear = year;*/
     GetDataAjax(year + "-" + month + ".json");
 }
 
@@ -681,14 +682,22 @@ function getDateFromPath(path) {
 function callTriggerExt(url) {
     if (isExtRequestVal) {
         var date = getDateFromPath(url.pathname);
-        htmx.trigger("#api-ext-data", "msu-ext-data", { toEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last" }); // вместо "click from:a""
+        htmx.trigger("#api-ext-data", "msu-ext-data", {
+            replaceEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last",
+            headers: { "msu-PreMonth": curCldYear + "-" + curCldMonth }
+        });
     }
     else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
 
     // API-запрос данных календаря
     if (true) { // при манипуляциях с элементами управления календаря (стрелки влево/вправо и поля под календарём) всегда идёт выполнение отдельного запроса api-ext-cld
         var path = '';
-        if (url.pathname === basePath)
+        var date = getDateFromPath(url.pathname);
+        if (date === null)
+            path = 'last'; // -next тоже должна сюда попасть, т.к. следующий материал уже может быть в следующем месяце, а дата здесь будет ещё предыдущего месяца
+        else
+            path = date.getFullYear() + '-' + date.getMonth();
+        /*if (url.pathname === basePath)
             path = 'last';
         else {
             var dateArr = url.pathname.split(/.*?\/\d{2}.(\d{2}).(\d{2}).html/);
@@ -707,7 +716,7 @@ function callTriggerExt(url) {
                 else
                     path = 'last'; // -next тоже должна сюда попасть, т.к. следующий материал уже может быть в следующем месяце, а дата здесь будет ещё предыдущего месяца
             }
-        }
+        }*/
         var elCld = htmx.find("#api-ext-cld");
         var apiPath = elCld.attributes['hx-get'].value;
         elCld.attributes['hx-get'].value = apiPath.replace(/(ext\/cld\/).*?(\.json)/, "$1" + path + "$2");
@@ -1124,3 +1133,4 @@ else {
 
 }
 
+basePath = getBasePath(); // этот код нельзя ставить в startOnLoad(), т.к. при возврате кнопкой браузере "Назад" startOnLoad() не срабатывает - см. первый комментарий в этом файле

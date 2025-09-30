@@ -211,7 +211,7 @@ function createCalendar(calendar, element, adjuster){
             var number = DayNumber(i+1);
             // Check Date against Event Dates
             for(var n = 0; n < calendar.Model.length; n++){
-                var evDate = new Date(calendar.Model[n].Date);//DT calendar.Model[n].Date;
+                var evDate = new Date(Date.parse(calendar.Model[n].Date));//DT calendar.Model[n].Date;
                 var toDate = new Date(calendar.Selected.Year, calendar.Selected.Month, (i+1));
                 if(evDate.getTime() == toDate.getTime()){
                     number.className += " eventday";
