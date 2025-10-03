@@ -29,6 +29,7 @@ numbMinutes = 30; // количество минут, по истечению к
 numbTryLoadImg = {}; // попытки загрузок изображений при ошибке их загрузке
 isIE = false;
 triggerOnload = "msu-on-get-dns";
+isLoaded = false; // признак, что первоначальная загрузка сайта была выполнена
 isReadDnsLinks = false; // dnsLinks получен
 basePath = '';
 minCldYear = 2016;
@@ -82,6 +83,8 @@ function startOnLoad() {
     }
     //debugger;
     //if (isIE) startReplaceDataStream(); // это не правильно здесь использовать, т.к. onload срабатывает только после полной/окончательной загрузки всех данных, а у нас загружаться может в несколько этапов поток
+
+    isLoaded = true;
 }
 addLoadEvent(startOnLoad);
 
@@ -351,7 +354,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
     // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
     if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
-        callTriggerExt(url);
+        callTriggerExtWhenChangePage(url);
 
     detail.path = (sendExtSPA
         && (detail.boosted
@@ -369,6 +372,12 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
     if (isAlert) alert("hostname = " + hostname);
 });
+
+/*document.body.addEventListener('htmx:afterProcessNode', function (evt) {
+    if (evt.detail.elt.id === "api-ext-cld") {
+        htmx.trigger('#api-ext-cld', "msu-ext-cld");
+    }
+});*/
 
 document.body.addEventListener('htmx:beforeHistoryUpdate', function (evt) { // beforeOnLoad
     returnOriginalExtension(evt); // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
@@ -614,14 +623,14 @@ function onChangeYear(year) {
 }
 
 function changeCalendar(month, year) {
-    /*curCldMonth = month;
-    curCldYear = year;*/
-    GetDataAjax(year + "-" + month + ".json");
+    //GetDataAjax(year + "-" + month + ".json");
+    //htmx.trigger('#api-ext-cld', "msu-ext-cld", { replaceEndPath: year + "-" + month + ".json" });
+    CldProcess(year + "-" + month);
 }
 
-function GetDataAjax(path/*, year, month*/) {
+/*function GetDataAjax(path) {
     let url = getURL("/ext/cld/");
-    htmx.ajax('GET', url.href + path, { handler: handlerCld/*, values: { "year": year, "month": month }*/ }).then(
+    htmx.ajax('GET', url.href + path, { handler: handlerCld }).then(
         function (result) {
             let a = 1;
             //debugger
@@ -633,21 +642,10 @@ function GetDataAjax(path/*, year, month*/) {
     );
 }
 
-function handlerCld(elt, detail/*, year, month*/) {
+function handlerCld(elt, detail) {
     var text = detail.xhr.response;
-    /*var dateArr = detail.pathInfo.responsePath.split(/\/.*\/(\d{4})-(\d{1,2}).json/);
-    var month = parseInt(dateArr[2]-1);
-    var year = parseInt(dateArr[1]);
-
-    var eltTitle = document.getElementById('cldTitle');
-    var eltMonth = document.getElementById('cldMonth');
-    if (month+1 && year) {
-        eltTitle.innerHTML = eltMonth.options[month].text + " " + year;
-
-        processJsonCld(text, new Date(year, month, 1));
-    }*/
     processJsonCld(text);
-}
+}*/
 
 function getDateFromPath(path) {
     if (path === basePath)
@@ -679,49 +677,34 @@ function getDateFromPath(path) {
 /* -----------  Работа с повторными отправками запросов на другие хосты  ------------ */
 
 
-function callTriggerExt(url) {
+function callTriggerExtWhenChangePage(url) {
     if (isExtRequestVal) {
         var date = getDateFromPath(url.pathname);
         htmx.trigger("#api-ext-data", "msu-ext-data", {
             replaceEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last",
-            headers: { "msu-PreMonth": curCldYear + "-" + curCldMonth }
+            headers: { "msu-PreMonth": curCldYear + "-" + curCldMonth, 'msu-IsCldRequest': isCldRequestVal }
         });
     }
     else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
 
     // API-запрос данных календаря
-    if (true) { // при манипуляциях с элементами управления календаря (стрелки влево/вправо и поля под календарём) всегда идёт выполнение отдельного запроса api-ext-cld
+    if (isCldRequestVal) {
         var path = '';
         var date = getDateFromPath(url.pathname);
         if (date === null)
             path = 'last'; // -next тоже должна сюда попасть, т.к. следующий материал уже может быть в следующем месяце, а дата здесь будет ещё предыдущего месяца
         else
-            path = date.getFullYear() + '-' + date.getMonth();
-        /*if (url.pathname === basePath)
-            path = 'last';
-        else {
-            var dateArr = url.pathname.split(/.*?\/\d{2}.(\d{2}).(\d{2}).html/);
-            if (dateArr.length > 1) {
-                var year = parseInt(dateArr[2]);
-                var month = parseInt(dateArr[1]);
-                path = '20' + year + '-' + month;
-            }
-            else {
-                var dateArr2 = url.pathname.split(/.*?\/(\d{4})-(\d{2})-\d{2}/);
-                if (dateArr.length > 1) {
-                    var year = parseInt(dateArr2[1]);
-                    var month = parseInt(dateArr2[2]);
-                    path = year + '-' + month;
-                }
-                else
-                    path = 'last'; // -next тоже должна сюда попасть, т.к. следующий материал уже может быть в следующем месяце, а дата здесь будет ещё предыдущего месяца
-            }
-        }*/
-        var elCld = htmx.find("#api-ext-cld");
-        var apiPath = elCld.attributes['hx-get'].value;
-        elCld.attributes['hx-get'].value = apiPath.replace(/(ext\/cld\/).*?(\.json)/, "$1" + path + "$2");
-        htmx.process(elCld); // это так же выполняет htmx.trigger("#api-ext-cld", "msu-ext-cld");
+            path = date.getFullYear() + '-' + (date.getMonth()+1);
+
+        CldProcess(path);
     }
+}
+
+function CldProcess(path) {
+    var elCld = htmx.find("#api-ext-cld");
+    elCld.attributes['hx-get'].value = elCld.attributes['hx-get'].value.replace(/(ext\/cld\/).*?(\.json)/, "$1" + path + "$2");
+    //elCld.attributes['hx-trigger'].value = elCld.attributes['hx-trigger'].value.replace(/(load).*?(, msu-ext-cld)/, "$1$2"); // теперь это не надо, т.к. эта проблема устраняется в isCldRequestOnLoad() с пом. isLoaded, а иначе, при изменении триггера - хэши не будут совпадать. (Поскольку при первоначальной загрузке страницы триггер с условием для load ("load[isCldRequestOnLoad()], msu-ext-cld"), то это условие надо убрать, т.к. в данном случае мы всегда должны выполнять этот запрос)
+    htmx.process(elCld); // это так же выполняет запрос если есть триггер load
 }
 
 // дополнительные запросы всегда выполняются не к домену по умолчанию (т.е. на котором открыт сайт), а к доп. хостам (для автономного режима всегда есть доп. хост)
@@ -735,7 +718,7 @@ function reCallRequest(evt, withoutBase) {
             && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger // если элемент первоначально был вызван через триггер, то снова вызываем этот триггер
             && evt.srcElement["htmx-internal-data"].listenerInfos[0].trigger.indexOf('msu-ext-') === 0
         ) {
-            callTriggerExt();
+            callTriggerExtWhenChangePage();
         }
         else htmx.ajax('GET', path, '#' + evt.detail.target.getAttribute('id')/*'#main-cont'*/).then(
             function (result) {
@@ -859,7 +842,7 @@ function isQuoteRequest() {
 }
 
 function isCldRequestOnLoad() {
-    return isCldRequestVal;
+    return !isLoaded ? isCldRequestVal : true; // false устанавливается только для первоначальной загрузки страницы целиком, в остальных случаях (при переходах с пом. htmx) нужно всегда возвращать true, чтобы htmx.process в качестве ajax-запроса работал
 }
 
 
