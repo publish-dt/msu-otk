@@ -17,7 +17,7 @@ originalHostname = hostname; // запоминаем изначальный хо
 
 
 isQuoteRequestVal = false; // получать цитату отдельным запросом
-isCldRequestVal = false; // получать данные календаря отдельным запросом (может быть закэширован в отдельный файл)
+isCldRequestVal = true; // получать данные календаря отдельным запросом (может быть закэширован в отдельный файл)
 isExtRequestVal = true; // получать различные динамические данные одним запросом (не кэшируется этот запрос/данные)
 
 urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
@@ -623,9 +623,11 @@ function onChangeYear(year) {
 }
 
 function changeCalendar(month, year) {
-    //GetDataAjax(year + "-" + month + ".json");
-    //htmx.trigger('#api-ext-cld', "msu-ext-cld", { replaceEndPath: year + "-" + month + ".json" });
-    CldProcess(year + "-" + month);
+    if (curCldYear != year && curCldMonth != month) {
+        //GetDataAjax(year + "-" + month + ".json");
+        //htmx.trigger('#api-ext-cld', "msu-ext-cld", { replaceEndPath: year + "-" + month + ".json" });
+        CldProcess(year + "-" + month);
+    }
 }
 
 /*function GetDataAjax(path) {
@@ -696,7 +698,9 @@ function callTriggerExtWhenChangePage(url) {
         else
             path = date.getFullYear() + '-' + (date.getMonth()+1);
 
-        CldProcess(path);
+        if (date === null || (curCldYear != date.getFullYear() && curCldMonth != (date.getMonth() + 1))) {
+            CldProcess(path);
+        }
     }
 }
 
@@ -843,6 +847,13 @@ function isQuoteRequest() {
 
 function isCldRequestOnLoad() {
     return !isLoaded ? isCldRequestVal : true; // false устанавливается только для первоначальной загрузки страницы целиком, в остальных случаях (при переходах с пом. htmx) нужно всегда возвращать true, чтобы htmx.process в качестве ajax-запроса работал
+}
+
+function getPreCldPath() {
+    if (typeof curCldYear !== 'undefined' && typeof curCldMonth !== 'undefined')
+        return curCldYear + '-' + curCldMonth;
+    else
+        return 'last';
 }
 
 
