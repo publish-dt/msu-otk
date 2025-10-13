@@ -37,3 +37,21 @@
     content: attr(aria-label);
     position: absolute;
 }
+
+
+
+/* переопределяем классы для спиннера */
+.my-indicator {
+    opacity: 0;
+    transition: opacity 500ms ease-in;
+}
+
+.htmx-request .my-indicator {
+    opacity: 1;
+    transition-delay: 3s; /* задержка, чтобы спиннер не мелькал при быстрых ответах запроса, а отображался только когда запрос слишком долго выполняется */
+}
+
+.htmx-request.my-indicator {
+    opacity: 1;
+    transition-delay: 3s; /* задержка, чтобы спиннер не мелькал при быстрых ответах запроса, а отображался только когда запрос слишком долго выполняется */
+}

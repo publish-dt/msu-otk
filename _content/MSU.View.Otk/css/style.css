@@ -377,9 +377,9 @@ td{
 	text-decoration: none;
 }
 /*Активный пункт меню*/
-.top-menu-ul li.active a{
+.top-menu-ul li.selected a {
 	background: none !important;
-	color: #9CF !important;	/*голубой ссылка*/	
+	color: #9CF !important; /*голубой ссылка*/
 }
 /*---------------------Пункты меню без ссылок-----------------------*/
 .top-menu-ul li{
@@ -394,10 +394,10 @@ td{
 	text-decoration: none;
 }
 /*Активный пункт меню*/
-.top-menu-ul li.active{
-	background: none !important;
-	color: #9CF !important;	/*голубой ссылка*/	
-}
+	.top-menu-ul li.selected {
+		background: none !important;
+		color: #9CF !important; /*голубой ссылка*/
+	}
 .top-menu-pad{
 	padding: 10px 5px;
 }
@@ -1601,8 +1601,11 @@ SPAN.c2, SPAN.c3, SPAN.c4, SPAN.c5 {
 	color: #FFFFFF;
 }
 	.btn-link:hover,
+	.btn-link:active,
 	.btn-link:focus {
 		color: #FFFFFF;
+		text-decoration: none;
+		border-width: 0px;
 	}
 
 
@@ -1620,4 +1623,5 @@ SPAN.c2, SPAN.c3, SPAN.c4, SPAN.c5 {
 .poem::before {
 	left: 8px;
 	margin-top: -19px;
+	font-size: medium;
 }

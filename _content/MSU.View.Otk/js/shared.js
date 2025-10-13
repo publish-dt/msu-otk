@@ -1,5 +1,6 @@
 var months = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
 
+// нумерация четверостиший Катренов
 function tooltipstering(isPrint/* = false*/) {
     if (isPrint === undefined) isPrint = false;
 

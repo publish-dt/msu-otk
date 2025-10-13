@@ -17,7 +17,7 @@ originalHostname = hostname; // запоминаем изначальный хо
 
 
 isQuoteRequestVal = false; // получать цитату отдельным запросом
-isCldRequestVal = true; // получать данные календаря отдельным запросом (может быть закэширован в отдельный файл)
+isCldRequestVal = false; // получать данные календаря отдельным запросом (может быть закэширован в отдельный файл)
 isExtRequestVal = true; // получать различные динамические данные одним запросом (не кэшируется этот запрос/данные)
 
 urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
@@ -64,10 +64,10 @@ function startOnLoad() {
     var eventsCld = [];
     var settings = { };
     var element = document.getElementById('caleandar');
+    element.innerHTML = '';
     caleandar(element, eventsCld, settings); // , newDateCld
 
-    var nonext = localStorage.getItem('nonext');
-    EnableDisableNonext(JSON.parse(nonext));
+    EnableDisableNonext();
 
     /*let url_ = new URL(document.baseURI);
     basePath = url_.protocol === "file:" ? "/" : url_.pathname;*/
@@ -172,16 +172,23 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
 }
 
 
-// вкл/откл. показ перехода к будущей последней странице Катрена при её текущем отсутствии
+// вкл/откл. показ перехода к будущей последней странице Катрена при её текущем отсутствии (https://example.com/#nonext-true)
 var styleDyn = document.createElement('style');
 document.head.appendChild(styleDyn);
 function EnableDisableNonext(isEnableNonext) {
+    isEnableNonext = JSON.parse(getHashValue('nonext'));
+
+    if (isEnableNonext === undefined || isEnableNonext === null) {
+        var nonext = localStorage.getItem('msu-nonext');
+        isEnableNonext = JSON.parse(nonext);
+    }
+
     if (isEnableNonext === true) {
-        localStorage.setItem('nonext', true);
+        localStorage.setItem('msu-nonext', true);
         styleDyn.innerHTML = '.nonext { display: inline; }';
     }
     else if (isEnableNonext === false) {
-        localStorage.setItem('nonext', false);
+        localStorage.setItem('msu-nonext', false);
         styleDyn.innerHTML = '.nonext { display: none; }';
     }
 }
@@ -194,12 +201,12 @@ function EnableDisableNonext(isEnableNonext) {
 
 
 
-// управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
+// управление отображением нумерацией четверостиший Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
 function hiddenTooltip(el) {
     el.style.setProperty("--visibility", "hidden");
 }
 
-// управление отображением номера стиха Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
+// управление отображением нумерацией четверостиший Катрена, чтобы он по таймеру пропадал, когда на элементе мышка стоит долго
 function clearTooltip() {
 
     let listTimeoutID = [];
@@ -207,7 +214,7 @@ function clearTooltip() {
         return box.addEventListener('mouseenter', function (event) {
             //event.target.style.setProperty("--visibility", "visible");
 
-            timeoutID = window.setTimeout(hiddenTooltip, 1500, event.target);
+            timeoutID = window.setTimeout(hiddenTooltip, 500, event.target);
             listTimeoutID.push([event.target, timeoutID]);
         });
     }
@@ -353,8 +360,10 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     let url = getURL(path);
 
     // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
-    if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote")
-        callTriggerExtWhenChangePage(url);
+    if (detail.boosted && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote") {
+        if (!callTriggerExtWhenChangePage(url))
+            detail.headers["msu-addclient"] = true;
+    }
 
     detail.path = (sendExtSPA
         && (detail.boosted
@@ -383,6 +392,22 @@ document.body.addEventListener('htmx:beforeHistoryUpdate', function (evt) { // b
     returnOriginalExtension(evt); // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
 });
 
+document.body.addEventListener('htmx:afterOnLoad', function (evt) {
+    if (evt.srcElement.parentElement.attributes['aria-selected']) {
+        let currentTab = document.querySelector('[aria-selected=true]');
+        if (currentTab) {
+            currentTab.setAttribute('aria-selected', 'false');
+            currentTab.classList.remove('selected');
+        }
+
+        let newTab = evt.target.parentElement;
+        if (newTab) {
+            newTab.setAttribute('aria-selected', 'true');
+            newTab.classList.add('selected');
+        }
+    }
+});
+
 // событие: перед заменой таргета полученными в результате запроса данными
 document.body.addEventListener('htmx:beforeSwap', function (evt) {
 
@@ -403,7 +428,7 @@ document.body.addEventListener('htmx:beforeSwap', function (evt) {
     }
     else {
         let menu = htmx.find("#bs-navbar");
-        if (menu.classList.contains('in') === true)
+        if (menu && menu.classList.contains('in') === true)
             htmx.toggleClass(menu, "in");
 
         // при клике по ссылке в цитате, т.к. у элемента quote-block hx-target="this", то нужно его заменить на #main-cont, иначе основной контент прямо в quote-block выводится 
@@ -484,18 +509,20 @@ htmx.defineExtension('json-response', {
             //var mustacheTemplate = htmx.closest(elt, '[mustache-template]')
             var apiName = elt.getAttribute('id')
             //debugger
-            if (text[0] === "{" || text[0] === "[") {
-                if (apiName === 'api-ext-data') {
-                    return processJson(text);
+            if (text) {
+                if (text[0] === "{" || text[0] === "[") {
+                    if (apiName === 'api-ext-data') {
+                        return processJson(text);
+                    }
+                    else if (apiName === 'api-ext-cld') {
+                        /*var dateArr = elt["htmx-internal-data"].path.split(/\/.*\/(\d{4})-(\d{1,2}).json/);
+                        if (dateArr.length > 3)*/
+                            return processJsonCld(text/*, new Date(parseInt(dateArr[1]), parseInt(dateArr[2]) - 1, 1)*/);
+                    }
                 }
-                else if (apiName === 'api-ext-cld') {
-                    /*var dateArr = elt["htmx-internal-data"].path.split(/\/.*\/(\d{4})-(\d{1,2}).json/);
-                    if (dateArr.length > 3)*/
-                        return processJsonCld(text/*, new Date(parseInt(dateArr[1]), parseInt(dateArr[2]) - 1, 1)*/);
-                }
+                else
+                    throw new Error('Неправильный формат данных (не json).')
             }
-            else
-                throw new Error('Неправильный формат данных (не json).')
         }
 
         return ""; //throw new Error('Данные не найдены!'); // 
@@ -573,7 +600,6 @@ function processJsonCld(text/*, newDate*/) {
 
         var element = document.getElementById('caleandar');
         element.innerHTML = '';
-
         caleandar(element, daysData, {}, newDate);
 
         // заполнение списка годов в поле выбора (под календарём)
@@ -623,7 +649,7 @@ function onChangeYear(year) {
 }
 
 function changeCalendar(month, year) {
-    if (curCldYear != year && curCldMonth != month) {
+    if (curCldYear != year || curCldMonth != month) {
         //GetDataAjax(year + "-" + month + ".json");
         //htmx.trigger('#api-ext-cld', "msu-ext-cld", { replaceEndPath: year + "-" + month + ".json" });
         CldProcess(year + "-" + month);
@@ -674,6 +700,18 @@ function getDateFromPath(path) {
     }
 }
 
+function isCldRequestOnLoad() {
+    return !isLoaded ? isCldRequestVal : true; // false устанавливается только для первоначальной загрузки страницы целиком, в остальных случаях (при переходах с пом. htmx) нужно всегда возвращать true, чтобы htmx.process в качестве ajax-запроса работал
+}
+
+function getPreCldPath() {
+    if (typeof curCldYear !== 'undefined' && typeof curCldMonth !== 'undefined')
+        return curCldYear + '-' + curCldMonth;
+    else
+        return 'empty';
+}
+
+
 
 
 /* -----------  Работа с повторными отправками запросов на другие хосты  ------------ */
@@ -684,10 +722,11 @@ function callTriggerExtWhenChangePage(url) {
         var date = getDateFromPath(url.pathname);
         htmx.trigger("#api-ext-data", "msu-ext-data", {
             replaceEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last",
-            headers: { "msu-PreMonth": curCldYear + "-" + curCldMonth, 'msu-IsCldRequest': isCldRequestVal }
+            headers: { "msu-PreMonth": getPreCldPath(), 'msu-IsCldRequest': isCldRequestVal }
         });
     }
-    else if (isQuoteRequestVal) htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
+    else if (isQuoteRequestVal)
+        htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
 
     // API-запрос данных календаря
     if (isCldRequestVal) {
@@ -698,10 +737,15 @@ function callTriggerExtWhenChangePage(url) {
         else
             path = date.getFullYear() + '-' + (date.getMonth()+1);
 
-        if (date === null || (curCldYear != date.getFullYear() && curCldMonth != (date.getMonth() + 1))) {
+        if (date === null || (curCldYear != date.getFullYear() || curCldMonth != (date.getMonth() + 1))) {
             CldProcess(path);
         }
+        else if (!isExtRequestVal) { // это для сайта Катренов, т.к. у него нет отдельных запросов, по которым можно добавить онлайн-пользователя
+            return false;
+        }
     }
+
+    return true;
 }
 
 function CldProcess(path) {
@@ -845,17 +889,6 @@ function isQuoteRequest() {
     return isQuoteRequestVal;
 }
 
-function isCldRequestOnLoad() {
-    return !isLoaded ? isCldRequestVal : true; // false устанавливается только для первоначальной загрузки страницы целиком, в остальных случаях (при переходах с пом. htmx) нужно всегда возвращать true, чтобы htmx.process в качестве ajax-запроса работал
-}
-
-function getPreCldPath() {
-    if (typeof curCldYear !== 'undefined' && typeof curCldMonth !== 'undefined')
-        return curCldYear + '-' + curCldMonth;
-    else
-        return 'last';
-}
-
 
 function getBaseURI() {
     if (document.baseURI) return document.baseURI;
@@ -868,6 +901,75 @@ function getBasePath() {
     let url_ = new URL(document.baseURI);
     return url_.protocol === "file:" ? "/" : url_.pathname;
 }
+
+function getHashValue(hashName) {
+    var hash = window.location.hash.substring(1);
+    var hashArr = hash.split('-');
+    if (hashArr.length > 1 && hashArr[0] === hashName)
+        return hashArr[1];
+    else
+        return 'null';
+}
+
+/*function getSetUserId() {
+    var guid = getCookie('msu-clientid');
+    if (!guid) {
+        var guid = generateUUID();
+
+        setCookie('msu-clientid', guid, { 'max-age': 31536000 });
+    }
+
+    return guid;
+}
+
+function generateUUID() { // Public Domain/MIT
+    var d = new Date().getTime();//Timestamp
+    var d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now() * 1000)) || 0;//Time in microseconds since page-load or 0 if unsupported
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16;//random number between 0 and 16
+        if (d > 0) {//Use timestamp until depleted
+            r = (d + r) % 16 | 0;
+            d = Math.floor(d / 16);
+        } else {//Use microseconds since page-load if supported
+            r = (d2 + r) % 16 | 0;
+            d2 = Math.floor(d2 / 16);
+        }
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
+function getCookie(name) {
+    let matches = document.cookie.match(new RegExp(
+        "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+    ));
+    return matches ? decodeURIComponent(matches[1]) : undefined;
+}
+
+function setCookie(name, value, options) {
+    if (options === undefined) options = { path: '/' };
+
+    //options = {
+    //    path: '/',
+    //    // при необходимости добавьте другие значения по умолчанию
+    //    ...options
+    //};
+
+    if (options.expires instanceof Date) {
+        options.expires = options.expires.toUTCString();
+    }
+
+    let updatedCookie = encodeURIComponent(name) + "=" + encodeURIComponent(value);
+
+    for (let optionKey in options) {
+        updatedCookie += "; " + optionKey;
+        let optionValue = options[optionKey];
+        if (optionValue !== true) {
+            updatedCookie += "=" + optionValue;
+        }
+    }
+
+    document.cookie = updatedCookie;
+}*/
 
 /**
 * @param {string} tag

@@ -222,5 +222,6 @@ P.poem {
 .poem::before {
 	content: attr(aria-label);
 	position: absolute;
-	left: 0px;
+	left: 8px;
+	opacity: 0.3;
 }
