@@ -498,11 +498,12 @@ td{
 /*------СТИЛИ ДЛЯ КАЛЕНДАРЯ СЛЕВА----------*/
 /*-----------------------------------------*/
 /*обводка*/
-.kalendar{
+.kalendar {
 	background-color: #136 !important; /*синий цвет фона*/
 	border-width: 1px 2px;
 	border-style: solid;
 	border-color: #8BE #9CF #9CF #8BE;
+	max-width: 230px;
 }
 .kalendar .table-condensed {
     font: 12px/13px Verdana,sans-serif; /*Шрифт в календаре*/

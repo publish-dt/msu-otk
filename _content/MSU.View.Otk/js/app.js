@@ -34,6 +34,12 @@ isReadDnsLinks = false; // dnsLinks получен
 basePath = '';
 minCldYear = 2016;
 maxCldYear = new Date().getFullYear();
+
+/** это для периодической отправки запросов для отслеживания, что пользоветель ещё активен на сайте */
+startTime = new Date(); // время с начала нового отсчёта отслеживания активности
+moveCounter = 0; // счётчик движения мыши на странице, если =0, то пользователь не активен на странице
+intervalAddUser = 60000 - 15000; // (млсек.) продолжительность интервала, через которые будет периодически отправляться запрос на подтверждение активности пользователя. 300000 - длительность хэша _!UsersOnline_; 15000 - это 10 сек. (берётся из every 10s в hx-trigger) + 5 сек. запаса
+
 //MSUDATA_TAG_REGEX = msuMakeTagRegEx('msu-data');
 
 htmx.config.timeout = 15000; // (милисекунды) максимальное время ожидания результата запроса (15 сек., т.к. очень долго может выполняться запрос к S3)
@@ -138,7 +144,7 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
 
                     let isLoadErrorVal = isLoadError();
                     // если ручной запрос (первое открытие в браузере), при открытии страницы, вернул ошибку, то инициируем событие msu-on-get-dns (используется в hx-trigger)
-                    if (urls.length > 0 && isLoadErrorVal || isAutonomy()) {
+                    if (urls.length > 0 && isLoadErrorVal || isAutonomyOrStatic()) {
                         if (isLoadErrorVal) callNewServer();
 
                         for (var i = 0; i < queue.length; i++) {
@@ -167,7 +173,7 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
             if (isAlert) alert("Ошибка при получении доменов: " + response.status);
         }*/
     }
-    else if (isAutonomy())
+    else if (isAutonomyOrStatic())
         htmx.trigger('#main-cont', triggerOnload, { detail: true });
 }
 
@@ -287,7 +293,7 @@ function imgSetSrc(targetEl) {
 // если сменился хост, то и изображения загружаем с нового хоста (т.к. старый недоступен, а значит будет ошибка загрузки, которая сюда приведёт),
 // а так же это для автономного режима получаем путь / байты изображения из БД, когда через механизм браузера не удалось загрузить(не было найдено изображение по указанному пути)
 window.getImgData = function (imgEl) {
-    if (isAutonomy() || hostname !== "") { // это для автономного и статического режима
+    if (isAutonomyOrStatic() || hostname !== "") { // это для автономного и статического режима
         let src = imgEl.getAttribute("src");
         if (src.indexOf('http') !== 0) src = hostname + (src.indexOf('/') === 0 ? "" : "/") + src;
 
@@ -331,11 +337,11 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     //else isFirstLoadRequest = false;
 
     let detail = evt.detail;
-    //if (!isAutonomy() && detail.headers["HX-Trigger"] !== undefined && detail.headers["HX-Trigger"] !== null && detail.headers["HX-Trigger"].indexOf('msu-') !== 0) return; // для всех триггеров, которые не начинаются с msu- не выполняем нижележащий код, например, для триггера "quote-block". Т.к. иначе подставляются к запросу .spa
+    //if (!isAutonomyOrStatic() && detail.headers["HX-Trigger"] !== undefined && detail.headers["HX-Trigger"] !== null && detail.headers["HX-Trigger"].indexOf('msu-') !== 0) return; // для всех триггеров, которые не начинаются с msu- не выполняем нижележащий код, например, для триггера "quote-block". Т.к. иначе подставляются к запросу .spa
 
     let path = detail.path;
 
-    if (isAutonomy() ||  // это для автономного или статического режима
+    if (isAutonomyOrStatic() ||  // это для автономного или статического режима
         (evt.detail.triggeringEvent !== undefined && evt.detail.triggeringEvent !== null && evt.detail.triggeringEvent.detail.notfound === true) || // или если при предыдущей попытке не найден
         isNewHost // или при предыдущей попытке был установлен новый хост, значит и последующие заприсы будем выполнять к этому новому хосту, пока он не сброситься 
     ) {
@@ -347,7 +353,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
         detail.headers['MSU-Dev'] = prefix;
         path = detail.path;
-        if (!isAutonomy() && detail.triggeringEvent !== undefined && detail.triggeringEvent.type === triggerOnload) { // detail.headers["HX-Trigger"] === "main-cont"
+        if (!isAutonomyOrStatic() && detail.triggeringEvent !== undefined && detail.triggeringEvent.type === triggerOnload) { // detail.headers["HX-Trigger"] === "main-cont"
             //if (path.indexOf('http') !== -1) return new URL(path);
             if (detail.headers["HX-Current-URL"] !== undefined) {
                 let hXCurrentURL = detail.headers["HX-Current-URL"];
@@ -379,6 +385,10 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
         }
     }
 
+    if (location.hostname === "")
+        detail.headers["msu-isAutonomy"] = true;
+
+
     if (isAlert) alert("hostname = " + hostname);
 });
 
@@ -405,6 +415,14 @@ document.body.addEventListener('htmx:afterOnLoad', function (evt) {
             newTab.setAttribute('aria-selected', 'true');
             newTab.classList.add('selected');
         }
+    }
+
+    // сбрасываем счётчик отслеживания активности пользователя
+    if (evt.detail.requestConfig.headers["HX-Trigger"] === "api-ext-addusr"
+        || evt.detail.requestConfig.headers["HX-Trigger"] === "api-ext-data"
+        || evt.detail.requestConfig.headers["HX-Trigger"] === "api-ext-cld") {
+        startTime = new Date();
+        moveCounter = 0;
     }
 });
 
@@ -455,7 +473,7 @@ document.body.addEventListener('htmx:afterSwap', function (evt) {
 
 // событие: произошла ошибка при запросе через htmx (например, не найдена страница или ошибка 500)
 document.body.addEventListener('htmx:responseError', function (evt) {
-    if (isAutonomy() && evt.detail.xhr.status === 404 ||  // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
+    if (isAutonomyOrStatic() && evt.detail.xhr.status === 404 ||  // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
         (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600)
     ) {
         if (evt.detail.boosted) callNewServer(evt); // выполняем повторный запрос к доп. хосту (только для запроса основного контента (не для ext и пр.))
@@ -470,7 +488,7 @@ document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
     //returnOriginalExtension(evt);
 });
 
-// событие: произошол превышение времени ожидания ответа при запросе через htmx
+// событие: произошло превышение времени ожидания ответа при запросе через htmx
 document.body.addEventListener('htmx:timeout', function (evt) {
     const url = getURL(evt.detail.pathInfo.finalRequestPath); // new URL
     badHosts[url.origin] = true;
@@ -562,6 +580,20 @@ function processJson(text) {
         }
     }
 }
+
+function checkIntervalAddUser() {
+    if (new Date() - startTime >= intervalAddUser && moveCounter > 0) {
+        startTime = new Date();
+        moveCounter = 0;
+
+        return true;
+    }
+}
+
+// сигнализирует, что пользователь активен/находится на странице
+window.addEventListener('scroll', function () {
+    typeof moveCounter !== 'undefined' ? moveCounter++ : 0;
+});
 
 
 
@@ -719,11 +751,13 @@ function getPreCldPath() {
 
 function callTriggerExtWhenChangePage(url) {
     if (isExtRequestVal) {
-        var date = getDateFromPath(url.pathname);
-        htmx.trigger("#api-ext-data", "msu-ext-data", {
-            replaceEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last",
-            headers: { "msu-PreMonth": getPreCldPath(), 'msu-IsCldRequest': isCldRequestVal }
-        });
+        if (url !== undefined) {
+            var date = getDateFromPath(url.pathname);
+            htmx.trigger("#api-ext-data", "msu-ext-data", {
+                replaceEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last",
+                headers: { "msu-PreMonth": getPreCldPath(), 'msu-IsCldRequest': isCldRequestVal }
+            });
+        }
     }
     else if (isQuoteRequestVal)
         htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
@@ -874,7 +908,7 @@ function isLoadError() {
 }
 
 // проверка, является ли текущее приложение автономным или работает в статическом режиме, например, через GitHub Pages
-function isAutonomy(event) {
+function isAutonomyOrStatic(event) {
     if (location.hostname === "" || isStaticMode === true)
         return true;
     else
