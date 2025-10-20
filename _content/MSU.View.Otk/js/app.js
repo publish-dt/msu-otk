@@ -1,4 +1,5 @@
 // let удалено (у тех, которые ещё раз присваиваются, т.к. ошибка возникает, когда через историю браузера возвращаемся назад, при этом заново загружается из кэша app.js и заново инициализируется, хотя он уже был ранее инициализирован (при первой загрузке страницы), и startOnLoad() уже не срабатывает
+verApp = "1.0"; // при изменении значения ОБЯЗАТЕЛЬНО необходимо поменять это значение и в MSU.Ext.Shared.ExtService
 domain = "";
 hostname = typeof hostname !== 'undefined' && hostname !== "" ? hostname : "";
 dnsLinks = typeof dnsLinks !== 'undefined' && dnsLinks !== "" ? dnsLinks : ""; // dnslink.msu.linkpc.net // если пусто, то не пытаемся подключиться к другим хостам
@@ -18,6 +19,7 @@ originalHostname = hostname; // запоминаем изначальный хо
 
 isQuoteRequestVal = false; // получать цитату отдельным запросом
 isCldRequestVal = false; // получать данные календаря отдельным запросом (может быть закэширован в отдельный файл)
+isOnlineRequestVal = false; // получать количество онлайн-польлзователей отдельным запросом
 isExtRequestVal = true; // получать различные динамические данные одним запросом (не кэшируется этот запрос/данные)
 
 urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
@@ -34,6 +36,18 @@ isReadDnsLinks = false; // dnsLinks получен
 basePath = '';
 minCldYear = 2016;
 maxCldYear = new Date().getFullYear();
+
+/* обратный отсчёт */
+servTime = undefined;
+timeleft = -1; // (в секундах) сколько осталось секунд до ближайшего Посыла
+diff = 0; // разница между временем на клиенте (в браузере) и на сервере
+counter = 0;
+counter2 = 0;
+counter3 = 0; // сколько прошло времени с последнего обновления
+rndLeft = 0;
+rndCounter = 0;
+timeUpdated = false;
+period = 5000; // интервал времени (в сек.) для обновления в отображении обратного отсчёта
 
 /** это для периодической отправки запросов для отслеживания, что пользоветель ещё активен на сайте */
 startTime = new Date(); // время с начала нового отсчёта отслеживания активности
@@ -74,9 +88,6 @@ function startOnLoad() {
     caleandar(element, eventsCld, settings); // , newDateCld
 
     EnableDisableNonext();
-
-    /*let url_ = new URL(document.baseURI);
-    basePath = url_.protocol === "file:" ? "/" : url_.pathname;*/
 
     getAddressFromDNS(true); // получаем первоначальный hostname (его может не быть) из DNS-записи
 
@@ -178,27 +189,6 @@ function getAddressFromDNS(isOriginDnsLink/*, evt, callback*/) {
 }
 
 
-// вкл/откл. показ перехода к будущей последней странице Катрена при её текущем отсутствии (https://example.com/#nonext-true)
-var styleDyn = document.createElement('style');
-document.head.appendChild(styleDyn);
-function EnableDisableNonext(isEnableNonext) {
-    isEnableNonext = JSON.parse(getHashValue('nonext'));
-
-    if (isEnableNonext === undefined || isEnableNonext === null) {
-        var nonext = localStorage.getItem('msu-nonext');
-        isEnableNonext = JSON.parse(nonext);
-    }
-
-    if (isEnableNonext === true) {
-        localStorage.setItem('msu-nonext', true);
-        styleDyn.innerHTML = '.nonext { display: inline; }';
-    }
-    else if (isEnableNonext === false) {
-        localStorage.setItem('msu-nonext', false);
-        styleDyn.innerHTML = '.nonext { display: none; }';
-    }
-}
-
 
 
 
@@ -261,6 +251,77 @@ function backTop() {
         window.scroll(0, 0);
         return false;
     });*/
+}
+
+// обратный отсчёт до Посыла
+function countdown() {
+
+    counter3 += period / 1000;
+
+    var today = 0;
+    var thour = timeleft <= 0 ? 0 : Math.floor(timeleft / 3600);
+    var tmin = timeleft <= 0 ? 0 : Math.floor(timeleft / 60 - 60 * thour);
+    var tsec = timeleft <= 0 ? 0 : timeleft % 60;
+
+    if (timeleft !== -1) {
+        timestr = (today > 0 ? '<span class="txt-gray">' + today + '</span>' + declOfNum(today, [' день ', ' дня ', ' дней ']) : '') + '<span class="txt-gray">' + thour + '</span>' + declOfNum(thour, [' час ', ' часа ', ' часов ']) + '<span class="txt-gray">' + tmin + '</span>' + declOfNum(tmin, [' минута ', ' минуты ', ' минут ']) + '<span class="txt-gray">' + tsec + '</span>' + " сек.";
+        document.getElementById('timeleft').innerHTML = timestr;
+        if (document.getElementById('timeleft-block').classList.contains('hidden')) {
+            document.getElementById('timeleft-block').classList.remove('hidden');
+        }
+    }
+    if (timeleft >= 0) timeleft -= period / 1000;
+
+    // за ~10-5 минут до Посыла устанавливаем рандомный момент времени для синхронизации (для тех, кто больше 30 минут назад обновился)
+    var max = 600;
+    var min = 300;
+    if (timeleft <= max + 10 && timeleft >= min && !timeUpdated && rndLeft === 0 && counter3 > 1800) {
+        rndLeft = Math.floor(Math.random() * (max - min + 1)) + min;
+        if (onDebugTimeleft) console.log('rndLeft = ' + rndLeft);
+    }
+
+    // синхронизируем остаток с сервером в назначенное рандомное время
+    if (rndLeft > 0 && timeleft <= rndLeft && timeleft > 0 && !timeUpdated) {
+        timeUpdated = true;
+        if (onDebugTimeleft) console.log('синхронизация за ~10 мин.');
+        time_server();
+    }
+
+    if (timeleft <= 0 && counter >= (900 + rndCounter)) { // через 15+rnd минут после начала Посыла синхронизируем (получаем остаток времени до следующего Посыла)
+        timeUpdated = false;
+        if (onDebugTimeleft) console.log('синхронизация через ~15 мин.');
+        time_server();
+        counter = 0;
+    }
+    else if (timeleft <= 0) counter += period / 1000;
+
+    // если разница во времени между сервером и локальным компьютером больше чем эта разница была при загрузке страницы, т.е. страница сайта была долго в спящем режиме (комп. был в спящем режиме)
+    if (Math.abs((new Date()) - servTime) > (diff + 30000)) {
+        if (counter2 >= 60) { // через каждую минуту пытаемся синхронизировать (поскольку плохое соединение, то не сразу получится)
+            if (onDebugTimeleft) console.log('разница - ' + Math.abs((new Date()) - servTime));
+            counter = 0;
+            counter2 = 0;
+            counter3 = 0;
+            timeUpdated = false;
+            time_server();
+        }
+        else counter2 += period / 1000;
+    }
+
+    /*if (counter >= 300) { // через каждые 5 минут (=300) синхронизируем остаток с сервером
+        time_server();
+        counter = 0;
+    }
+    else counter += 5;*/
+
+    servTime.setSeconds(servTime.getSeconds() + period / 1000); // поддерживаем в актуальном состоянии время, полученное с сервера
+
+    /*if (onDebugTimeleft) {
+        if (onDebugTimeleft) {
+            console.log('timeleft = ' + timeleft + '; rndLeft = ' + rndLeft + '; timeUpdated = ' + timeUpdated);
+            console.log('Выход из обработки параметров обратного отсчёта');
+        }
+    }*/
 }
 
 
@@ -570,6 +631,12 @@ function processJson(text) {
                     else if (data[i].targetJson === "calendar") {
                         processJsonCld(data[i].content);
                     }
+                    else if (data[i].targetJson === "countdown") {
+                        processJsonCountdown(data[i].content);
+                    }
+                    /*else if (data[i].targetJson === "message") {
+                        alert(data[i].content);
+                    }*/
                 }
                 return "";
             } else {
@@ -581,19 +648,40 @@ function processJson(text) {
     }
 }
 
-function checkIntervalAddUser() {
-    if (new Date() - startTime >= intervalAddUser && moveCounter > 0) {
-        startTime = new Date();
-        moveCounter = 0;
 
-        return true;
+
+
+function processJsonCountdown(text) {
+    if (text) {
+
+        var daysData = [];
+        var month = undefined;
+        var year = undefined;
+
+        if (text[0] === "{" || text[0] === "[") {
+            try {
+                data = JSON.parse(text)
+                if (data) {
+                    servTime = new Date(data.ServerTime);
+                    timeleft = data.TimeLeft;
+
+                    diff = Math.abs(new Date() - servTime);
+
+                    if (timeleft === -1) document.getElementById('timeleft-block').classList.add('hidden');
+
+                    countdown();
+                    setInterval(countdown, period);
+                } else {
+                    throw new Error('С сервера пришли пустые данные')
+                }
+            } catch (e) {
+                throw new Error(e.message)
+            }
+        }
     }
-}
 
-// сигнализирует, что пользователь активен/находится на странице
-window.addEventListener('scroll', function () {
-    typeof moveCounter !== 'undefined' ? moveCounter++ : 0;
-});
+    return "";
+}
 
 
 
@@ -601,72 +689,69 @@ window.addEventListener('scroll', function () {
 /* -----------  Работа с календарём  ------------ */
 
 function processJsonCld(text/*, newDate*/) {
-    var daysData = [];
-    var month = undefined;
-    var year = undefined;
+    if (text) {
 
-    if (text[0] === "{" || text[0] === "[") {
-        try {
-            data = JSON.parse(text)
-            if (data) {
-                month = data.Month;
-                year = data.Year;
-                minCldYear = data.MinYear;
-                daysData = data.DaysData;
-            } else {
-                throw new Error('С сервера пришли пустые данные')
-            }
-        } catch (e) {
-            throw new Error(e.message)
-        }
-    }
+        var daysData = [];
+        var month = undefined;
+        var year = undefined;
 
-    if (month + 1 && year) {
-        curCldMonth = month;
-        curCldYear = year;
-
-        var newDate = new Date(year, month-1);
-
-        var cldTitle = document.getElementById('cldTitle');
-        if (cldTitle) cldTitle.innerHTML = months[month - 1] + " " + year;
-
-        var element = document.getElementById('caleandar');
-        element.innerHTML = '';
-        caleandar(element, daysData, {}, newDate);
-
-        // заполнение списка годов в поле выбора (под календарём)
-        var selectYear = document.getElementById('cldYear');
-        if (selectYear.options.length === 1) {
-            for (i = minCldYear - 2004; i <= maxCldYear - 2004; i += 1) {
-                option = document.createElement('option');
-                option.value = 2004 + i;
-                option.text = 2004 + i;
-                selectYear.add(option);
+        if (text[0] === "{" || text[0] === "[") {
+            try {
+                data = JSON.parse(text)
+                if (data) {
+                    month = data.Month;
+                    year = data.Year;
+                    minCldYear = data.MinYear;
+                    daysData = data.DaysData;
+                } else {
+                    throw new Error('С сервера пришли пустые данные')
+                }
+            } catch (e) {
+                throw new Error(e.message)
             }
         }
-        selectYear.value = -1;
 
-        var selectMonth = document.getElementById('cldMonth');
-        selectMonth.value = -1;
+        if (month + 1 && year) {
+            curCldMonth = month;
+            curCldYear = year;
+
+            var newDate = new Date(year, month-1);
+
+            var cldTitle = document.getElementById('cldTitle');
+            if (cldTitle) cldTitle.innerHTML = months[month - 1] + " " + year;
+
+            var element = document.getElementById('caleandar');
+            element.innerHTML = '';
+            caleandar(element, daysData, {}, newDate);
+
+            // заполнение списка годов в поле выбора (под календарём)
+            var selectYear = document.getElementById('cldYear');
+            if (selectYear.options.length === 1) {
+                for (i = minCldYear - 2004; i <= maxCldYear - 2004; i += 1) {
+                    option = document.createElement('option');
+                    option.value = 2004 + i;
+                    option.text = 2004 + i;
+                    selectYear.add(option);
+                }
+            }
+            selectYear.value = -1;
+
+            var selectMonth = document.getElementById('cldMonth');
+            selectMonth.value = -1;
+        }
     }
 
     return "";
 }
 
 function onChangeCld(adjuster) {
-    /*var eltMonth = document.getElementById('cldMonth');
-    var month = parseInt(eltMonth.value) - 1;
-
-    var eltYear = document.getElementById('cldYear');
-    var year = parseInt(eltYear.value);*/
-
-    var date = new Date(curCldYear/*year*/, curCldMonth/*month*/ + adjuster - 1, 1);
-    var month/*curCldMonth*/ = date.getMonth();
-    var year/*curCldYear*/ = date.getFullYear();
+    var date = new Date(curCldYear, curCldMonth + adjuster - 1, 1);
+    var month = date.getMonth();
+    var year = date.getFullYear();
 
     var yearExist = false;
-    if (year/*curCldYear*/ >= minCldYear && year/*curCldYear*/ <= new Date().getFullYear()) { // проверяем, можно ли стрелками месяца перейти к след./пред. году, поскольку список годов ограничен
-        changeCalendar(month/*curCldMonth*/ + 1, year/*curCldYear*/);
+    if (year >= minCldYear && year <= new Date().getFullYear()) { // проверяем, можно ли стрелками месяца перейти к след./пред. году, поскольку список годов ограничен
+        changeCalendar(month + 1, year);
     }
 }
 
@@ -687,25 +772,6 @@ function changeCalendar(month, year) {
         CldProcess(year + "-" + month);
     }
 }
-
-/*function GetDataAjax(path) {
-    let url = getURL("/ext/cld/");
-    htmx.ajax('GET', url.href + path, { handler: handlerCld }).then(
-        function (result) {
-            let a = 1;
-            //debugger
-        },
-        function (error) {
-            let a = 2;
-            //debugger
-        }
-    );
-}
-
-function handlerCld(elt, detail) {
-    var text = detail.xhr.response;
-    processJsonCld(text);
-}*/
 
 function getDateFromPath(path) {
     if (path === basePath)
@@ -746,6 +812,8 @@ function getPreCldPath() {
 
 
 
+
+
 /* -----------  Работа с повторными отправками запросов на другие хосты  ------------ */
 
 
@@ -755,7 +823,7 @@ function callTriggerExtWhenChangePage(url) {
             var date = getDateFromPath(url.pathname);
             htmx.trigger("#api-ext-data", "msu-ext-data", {
                 replaceEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last",
-                headers: { "msu-PreMonth": getPreCldPath(), 'msu-IsCldRequest': isCldRequestVal }
+                headers: { 'msu-PreMonth': getPreCldPath(), 'msu-IsCldRequest': isCldRequestVal, 'msu-VerApp': verApp } // изменив здесь необходимо изменить и в <div id="api-ext-data"...
             });
         }
     }
@@ -802,14 +870,17 @@ function reCallRequest(evt, withoutBase) {
         ) {
             callTriggerExtWhenChangePage();
         }
-        else htmx.ajax('GET', path, '#' + evt.detail.target.getAttribute('id')/*'#main-cont'*/).then(
-            function (result) {
-                let a = 1;
-            },
-            function (error) {
-                let a = 2;
-            }
-        ); // https://v1.htmx.org/api/#ajax
+        else {
+            var promise = htmx.ajax('GET', path, '#' + evt.detail.target.getAttribute('id'));
+            /*promise.then( // не работает в IE11
+                function (result) {
+                    let a = 1;
+                },
+                function (error) {
+                    let a = 2;
+                }
+            );*/
+        }
     }
 }
 
@@ -883,6 +954,49 @@ function returnOriginalHostname() {
 
 
 
+/* -----------  Прочие функции  ------------ */
+
+
+// вкл/откл. показ перехода к будущей последней странице Катрена при её текущем отсутствии (https://example.com/#nonext-true)
+var styleDyn = document.createElement('style');
+document.head.appendChild(styleDyn);
+function EnableDisableNonext(isEnableNonext) {
+    isEnableNonext = JSON.parse(getHashValue('nonext'));
+
+    if (localStorage && (isEnableNonext === undefined || isEnableNonext === null)) {
+        var nonext = localStorage.getItem('msu-nonext');
+        isEnableNonext = JSON.parse(nonext);
+    }
+
+    if (isEnableNonext === true && localStorage) {
+        localStorage.setItem('msu-nonext', true);
+        styleDyn.innerHTML = '.nonext { display: inline; }';
+    }
+    else if (isEnableNonext === false && localStorage) {
+        localStorage.setItem('msu-nonext', false);
+        styleDyn.innerHTML = '.nonext { display: none; }';
+    }
+}
+
+function checkIntervalAddUser() {
+    if (new Date() - startTime >= intervalAddUser && moveCounter > 0) {
+        startTime = new Date();
+        moveCounter = 0;
+
+        return true;
+    }
+}
+
+// сигнализирует, что пользователь активен/находится на странице
+window.addEventListener('scroll', function () {
+    typeof moveCounter !== 'undefined' ? moveCounter++ : 0;
+});
+
+
+
+
+
+
 /*  ----------  Хелперы  ------------  */
 
 
@@ -915,14 +1029,15 @@ function isAutonomyOrStatic(event) {
         return false;
 }
 
-function isExtRequest() {
-    return isExtRequestVal;
-}
-
 function isQuoteRequest() {
     return isQuoteRequestVal;
 }
 
+// склонение числительных
+function declOfNum(number, titles) {
+    cases = [2, 0, 1, 1, 1, 2];
+    return titles[(number % 100 > 4 && number % 100 < 20) ? 2 : cases[(number % 10 < 5) ? number % 10 : 5]];
+}
 
 function getBaseURI() {
     if (document.baseURI) return document.baseURI;
@@ -1167,7 +1282,7 @@ if (navigator.userAgent.indexOf('MSIE') !== -1
                 var ind = url.indexOf('http') === 0 ? 1 : 0;
                 if (url.indexOf('/') === 0) url = url.substring(1);
 
-                var protocol = ind === 0 ? '' : url.split('//')[0],
+                var protocol = url.indexOf('//') === -1/*ind === 0*/ ? '' : url.split('//')[0],
                     comps = url.split('#')[0].replace(/^(https\:\/\/|http\:\/\/)|(\/)$/g, '').split('/'),
                     host = ind === 0 ? '' : comps[0],
                     search = comps[comps.length - 1].split('?')[1],
