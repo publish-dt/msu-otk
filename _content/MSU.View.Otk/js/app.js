@@ -18,10 +18,11 @@ originalHostname = hostname; // запоминаем изначальный хо
 
 
 
-isQuoteRequestVal = false; // получать цитату отдельным запросом
-isCldRequestVal = false; // получать данные календаря отдельным запросом (может быть закэширован в отдельный файл)
-isOnlineRequestVal = false; // получать количество онлайн-польлзователей отдельным запросом
 isExtRequestVal = true; // получать различные динамические данные одним запросом (не кэшируется этот запрос/данные)
+isQuoteRequestVal = !isExtRequestVal; // получать цитату отдельным запросом
+isCldRequestVal = !isExtRequestVal; // получать данные календаря отдельным запросом (может быть закэширован в отдельный файл)
+isOnlineRequestVal = !isExtRequestVal; // получать количество онлайн-польлзователей отдельным запросом
+isCountdownRequestVal = !isExtRequestVal; // получать данные обратного отсчёта отдельным запросом
 
 urls = []; // полный список доп. хостов, полученные из DNS TXT-записи
 newHosts = {}; // список новых/дополнительных хостов (т.к. текущий недоступен). Это не полный список, а только те, к которым уже был выполнен запрос, т.е уже знаем рабочий этот хост или недоступный
@@ -37,6 +38,9 @@ isReadDnsLinks = false; // dnsLinks получен
 basePath = '';
 minCldYear = 2016;
 maxCldYear = new Date().getFullYear();
+curCldMonth = undefined;
+curCldYear = undefined;
+
 
 /* обратный отсчёт */
 servTime = undefined;
@@ -64,8 +68,8 @@ htmx.config.timeout = 15000; // (милисекунды) максимально�
 
 
 
-/*document.querySelector('.header').style.setProperty("--header-background", "url('" + StaticResourcesHost + "/_content/msu.view.otk/img/header.jpg')");
-document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/msu.view.otk/img/stars.gif')");*/
+/*document.querySelector('.header').style.setProperty("--header-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/header.jpg')");
+document.querySelector('body').style.setProperty("--body-background", "url('" + StaticResourcesHost + "/_content/MSU.View.Otk/img/stars.gif')");*/
 
 document.baseURI = getBaseURI();
 //basePath = getBasePath(); этот код перенесён в самый низ, т.к. в IE11 сначала должна инициализироваться функция window.URL = function (которая используется в getBasePath())
@@ -314,7 +318,7 @@ function countdown() {
 
     var diffServ = new Date() - servTime;
     var diffLocal = new Date() - localTime;
-    /*// если разница во времени между сохранённой ранее локальной/клиентской датой и текущей локальной датой больше чем 5+5 сек, т.е. страница сайта была долго в спящем режиме (свёрнута или комп. был в спящем режиме)
+    // если разница во времени между сохранённой ранее локальной/клиентской датой и текущей локальной датой больше чем 5+5 сек, т.е. страница сайта была долго в спящем режиме (свёрнута или комп. был в спящем режиме)
     if (diffLocal > 10000) { // (diff + 30000)
         if (procBigDiff === false && checkIntervalAddUser(true)) { // когда окно браузера с сайтом свёрнуто, то js выполняет код раз в минуту, поэтому проверяем ещё и активность пользователя перед отправкой запроса
             procBigDiff = true;
@@ -329,7 +333,7 @@ function countdown() {
         if (checkIntervalAddUser()) {
             htmx.ajax('POST', '/ext/addusr', { source: '#dummy' }); // каждые 5 мин. (активные intervalAddUser) обновляем активность пользователя на сервере
         }
-    }*/
+    }
 
     servTime.setSeconds(servTime.getSeconds() + period / 1000); // поддерживаем в актуальном состоянии время, полученное с сервера
 
@@ -467,6 +471,7 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
     if (location.hostname === "")
         detail.headers["msu-isAutonomy"] = true;
 
+    detail.headers["msu-VerApp"] = verApp;
 
     if (isAlert) alert("hostname = " + hostname);
 });
@@ -496,10 +501,13 @@ document.body.addEventListener('htmx:afterOnLoad', function (evt) {
         }
     }
 
-    // сбрасываем счётчик отслеживания активности пользователя
-    if (evt.detail.requestConfig.headers["HX-Trigger"] === "api-ext-addusr"
+    // сбрасываем счётчик отслеживания активности пользователя (он будет сбрасываться, даже если данные беруться из кэша браузера)
+    var headerAddClient = evt.detail.xhr.getResponseHeader('msu-addclient');
+    if (headerAddClient === "true"
+        /*|| evt.detail.requestConfig.headers["HX-Trigger"] === "api-ext-addusr"
         || evt.detail.requestConfig.headers["HX-Trigger"] === "api-ext-data"
-        || evt.detail.requestConfig.headers["HX-Trigger"] === "api-ext-cld") {
+        || evt.detail.requestConfig.headers["HX-Trigger"] === "api-ext-cld"*/
+    ) {
         startTime = new Date();
         moveCounter = 0;
     }
@@ -537,8 +545,8 @@ document.body.addEventListener('htmx:beforeSwap', function (evt) {
         else {
             // это для ext, когда запрос выполняется не через htmx-триггер, а через htmx-ajax, т.е. результат возвращается не в defineExtension, а сюда в evt.detail.serverResponse
             if (evt.detail.serverResponse !== undefined && evt.detail.serverResponse !== null && evt.detail.requestConfig.triggeringEvent === null) {
-                if (processJson(evt.detail.serverResponse) === "")
-                    evt.detail.shouldSwap = false; // вставили данные в функции processJson, поэтому их больше не надо вставлять
+                if (processJsonExtData(evt.detail.serverResponse) === "")
+                    evt.detail.shouldSwap = false; // вставили данные в функции processJsonExtData, поэтому их больше не надо вставлять
             }
         }
     }
@@ -550,29 +558,35 @@ document.body.addEventListener('htmx:afterSwap', function (evt) {
     }
 });
 
-// событие: произошла ошибка при запросе через htmx (например, не найдена страница или ошибка 500)
+// событие: произошла ошибка при запросе через htmx (например, не найдена страница (или ошибка 500))
 document.body.addEventListener('htmx:responseError', function (evt) {
-    if (isAutonomyOrStatic() && evt.detail.xhr.status === 404 ||  // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
-        (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600)
+    if (isAutonomyOrStatic() && evt.detail.xhr.status === 404  // на статическом хосте не найдена страница (не была закэширована на стат. сайте)
+        //|| (evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600) нет смысла перенаправлять с ошибкой 500, т.к. на другом сервере будет таже ошибка
     ) {
         if (evt.detail.boosted) callNewServer(evt); // выполняем повторный запрос к доп. хосту (только для запроса основного контента (не для ext и пр.))
     }
+    else if (evt.detail.xhr.status != 200 && evt.detail.pathInfo.responsePath.indexOf('/ext/') === -1) // evt.detail.xhr.status >= 500 && evt.detail.xhr.status < 600
+        alert("Произошла непредвиденная ошибка на сервере!");
 });
 
 // событие: произошла ошибка при запросе через htmx (например, недоступен сервер)
 document.body.addEventListener('htmx:sendError', /*async*/ function (evt) {
-    const url = getURL(evt.detail.pathInfo.finalRequestPath); // new URL
-    badHosts[url.origin] = true;
-    callNewServer(evt);
-    //returnOriginalExtension(evt);
+    if (evt.detail.pathInfo.finalRequestPath.indexOf('/ext/') === -1) { /// для доп. запросов, пока, не будем пытаться отправлять запросы на другие сервера, т.к., например, /countdown, отправляется каждые 5 сек., если этот запрос успешно не выполнился.
+        const url = getURL(evt.detail.pathInfo.finalRequestPath); // new URL
+        badHosts[url.origin] = true;
+        callNewServer(evt);
+        //returnOriginalExtension(evt);
+    }
 });
 
 // событие: произошло превышение времени ожидания ответа при запросе через htmx
 document.body.addEventListener('htmx:timeout', function (evt) {
-    const url = getURL(evt.detail.pathInfo.finalRequestPath); // new URL
-    badHosts[url.origin] = true;
-    callNewServer(evt);
-    //returnOriginalExtension(evt);
+    if (evt.detail.pathInfo.finalRequestPath.indexOf('/ext/') === -1) { /// для доп. запросов, пока, не будем пытаться отправлять запросы на другие сервера, т.к., например, /countdown, отправляется каждые 5 сек., если этот запрос успешно не выполнился.
+        const url = getURL(evt.detail.pathInfo.finalRequestPath); // new URL
+        badHosts[url.origin] = true;
+        callNewServer(evt);
+        //returnOriginalExtension(evt);
+    }
 });
 
 // это для возрвата нового расширения запроса в исходное расширения (например, .spa возвращаем в .html или в пустое расширение)
@@ -610,10 +624,13 @@ htmx.defineExtension('json-response', {
                 if (text[0] === "{" || text[0] === "[") {
                     var data = JSON.parse(text)
                     if (apiName === 'api-ext-data') {
-                        return processJson(data/*text*/);
+                        return processJsonExtData(data);
                     }
                     else if (apiName === 'api-ext-cld') {
-                        return processJsonCld(data/*text*/);
+                        return processJsonCld(data);
+                    }
+                    else if (apiName === 'timeleft') {
+                        return processJsonCountdown(data);
                     }
                 }
                 else
@@ -625,7 +642,7 @@ htmx.defineExtension('json-response', {
     }
 })
 
-function processJson(data) {
+function processJsonExtData(data) {
     try {
         if (data) {
             for (var i = 0; i < data.length; i++) {
@@ -719,7 +736,7 @@ function processJsonCld(data) {
             minCldYear = data.MinYear;
             daysData = data.DaysData;
         } else {
-            throw new Error('С сервера пришли пустые данные')
+            //throw new Error('С сервера пришли пустые данные') могут быть пустыми при перемещении в приделах одного месяца, т.е. эти данные были ранее загружены
         }
     } catch (e) {
         throw new Error(e.message)
@@ -782,7 +799,7 @@ function changeCalendar(month, year) {
     if (curCldYear != year || curCldMonth != month) {
         //GetDataAjax(year + "-" + month + ".json");
         //htmx.trigger('#api-ext-cld', "msu-ext-cld", { replaceEndPath: year + "-" + month + ".json" });
-        CldProcess(year + "-" + month);
+        CldProcess(year + "-" + ("0" + month).slice(-2));
     }
 }
 
@@ -835,14 +852,17 @@ function callTriggerExtWhenChangePage(url) {
         if (url !== undefined) {
             var date = getDateFromPath(url.pathname);
             htmx.trigger("#api-ext-data", "msu-ext-data", {
-                replaceEndPath: date !== null ? (date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate()) : "last",
-                headers: { 'msu-PreMonth': getPreCldPath(), 'msu-IsCldRequest': isCldRequestVal, 'msu-VerApp': verApp } // изменив здесь необходимо изменить и в <div id="api-ext-data"...
+                replaceEndPath: date !== null ? (date.getFullYear() + "-" + ("0" + (date.getMonth() + 1)).slice(-2) + "-" + ("0" + date.getDate()).slice(-2)) : "last",
+                headers: { 'msu-PreMonth': getPreCldPath(), 'msu-IsCldRequest': isCldRequestVal } // изменив здесь необходимо изменить и в <div id="api-ext-data"...
             });
         }
     }
-    else if (isQuoteRequestVal)
+    if (isQuoteRequestVal)
         htmx.trigger("#quote-block", "msu-ext-quote"); // вместо "click from:a""
-
+    if (isOnlineRequestVal)
+        htmx.trigger("#online-block", "msu-ext-online");
+    if (isCountdownRequestVal)
+        htmx.trigger("#timeleft", "msu-ext-timeleft");
     // API-запрос данных календаря
     if (isCldRequestVal) {
         var path = '';
@@ -1064,10 +1084,6 @@ function isAutonomyOrStatic(event) {
         return false;
 }
 
-function isQuoteRequest() {
-    return isQuoteRequestVal;
-}
-
 // склонение числительных
 function declOfNum(number, titles) {
     cases = [2, 0, 1, 1, 1, 2];
@@ -1093,6 +1109,11 @@ function getHashValue(hashName) {
         return hashArr[1];
     else
         return 'null';
+}
+
+function getToken(nameToken) {
+    var cookie = document.cookie.split("; ").find(row => row.startsWith(nameToken + "="));
+    return cookie ? cookie.split("=")[1] : "";
 }
 
 /*function getSetUserId() {

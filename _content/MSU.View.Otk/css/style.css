@@ -915,18 +915,18 @@ p.c0 {
 	text-align: left;
 }
 /*Список годов Посланий*/
-.years {
-    width: 100%;
-    margin-top: 15px;
-   /* padding: 12pt 0px 0px;*/
-    line-height: 3;
-    text-align: center;
+.pagin {
+	width: 100%;
+	margin-top: 15px;
+	/* padding: 12pt 0px 0px;*/
+	line-height: 3;
+	text-align: center;
 	border-top: 1px solid #9CF;
 }
-.years  a{
-	font-size: 20px;
-	font-weight: bold;
-}
+	.pagin a {
+		font-size: 20px;
+		font-weight: bold;
+	}
 
 /* РЕЗУЛЬТАТЫ ПОИСКА */
 DIV.hr {
@@ -1047,6 +1047,11 @@ p.c6 {
 p.noind {
     text-indent: 0px;
     text-align: left;
+}
+p.date-footer {
+	margin: 8pt 0 8pt 0;
+	text-indent: 0;
+	text-align: left;
 }
 /*-------------------------------------------*/
 /*НОВЫЕ ТЕКСТЫ*/

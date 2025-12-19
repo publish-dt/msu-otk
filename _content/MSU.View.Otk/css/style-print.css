@@ -160,8 +160,18 @@ DIV.hr {width:100%; height:1px; margin:7pt 0 12pt 0; border-top:1px dashed #111;
 DIV.cont2 {padding:2pt 0 8pt 6.5pt; font-family:MyriadProCondensed,Arial,Helvetica,sans-serif; font-size:20px; line-height:1.0; color:#111;}
 SPAN.c2,SPAN.c3,SPAN.c4,SPAN.c5 {text-indent:0; font-style:italic; color:#333;}
 SPAN.c1 {font-style:italic; color:#333;}
-DIV.years {width:100%; margin:15pt 0 0 0; padding:12pt 0 0 0; line-height:1.0; color:#111; text-align:center; border-top:1px solid #000000;}
-DIV.years A {font-weight:600;}
+DIV.pagin {
+	width: 100%;
+	margin: 15pt 0 0 0;
+	padding: 12pt 0 0 0;
+	line-height: 1.0;
+	color: #111;
+	text-align: center;
+	border-top: 1px solid #000000;
+}
+	DIV.pagin A {
+		font-weight: 600;
+	}
 DIV A.download {font:13pt/14pt MyriadProCondensed,Arial,Helvetica,sans-serif; line-height:0.9; color:#000;}
 DIV A.download:link,DIV A.download:visited {text-decoration:none;}
 DIV A.download:hover,DIV A.download:active {text-decoration:underline;}
