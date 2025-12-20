@@ -956,11 +956,19 @@ DIV.hr {
     color: #9CF;
     text-decoration: none;
 }
+.search-res-el h4 {
+	color: #cef;
+	margin-top: 20px;
+	font-size: 20px;
+}
+.hightlight {
+	color: magenta;
+}
 
 /*Ширина экрана от 768px и выше, от планшета до компьютера*/
 @media only screen and (max-width: 768px){
 	/*заголовок Катрена в поиске по левому краю для мобильных устройств*/
-	#res .box-news{
+	#res .search-res-el {
 		text-align: left;
 	}
 }
