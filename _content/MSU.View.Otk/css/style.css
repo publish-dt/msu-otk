@@ -824,22 +824,24 @@ p.c0 {
 /*НИЖНЯЯ ЧАСТЬ ЦЕНТРАЛЬНОЙ СТРАНИЦЫ*/
 /*-----------------------------------------------------------*/
 /*Переход в начало страницы и между страницами*/
-.page-top-next{
-	width: 100%; 
-	padding-top: 40px; 
+.page-footer {
+	width: 100%;
+	padding-top: 40px;
 	padding-bottom: 40px;
 	text-align: center;
+	border-bottom: 4px double #f0f0f0;
+	margin-bottom: 10px;
 }
 /*для слов "В начало страницы" и "На следующую"*/
-.page-top-next a{
+.page-footer a{
 	color: #9CF;
 	text-decoration: none;
 	font-size: 20px;
 }
-.page-top-next a:hover{
+.page-footer a:hover{
 	color: #FFF;
 }
-.page-top-next a:active{
+.page-footer a:active{
 	color: #CEF;
 }
 
@@ -914,19 +916,28 @@ p.c0 {
 	padding-left: 10px;
 	text-align: left;
 }
-/*Список годов Посланий*/
+/*Список годов Посланий (пагинация)*/
 .pagin {
 	width: 100%;
-	margin-top: 15px;
-	/* padding: 12pt 0px 0px;*/
-	line-height: 3;
+	font-size: 22px;
+	margin-top: 25px;
+	padding-top: 20px;
+	/*line-height: 3;*/
 	text-align: center;
 	border-top: 1px solid #9CF;
 }
 	.pagin a {
-		font-size: 20px;
 		font-weight: bold;
+		color: #cef;
+		cursor: pointer;
+		margin: 0 1pt;
 	}
+	.pagin SPAN {
+		padding: 1pt 3pt 2pt;
+		border: 1px solid #f0f0f0;
+		margin: 0 3pt 0 3pt;
+	}
+
 
 /* РЕЗУЛЬТАТЫ ПОИСКА */
 DIV.hr {
@@ -936,10 +947,10 @@ DIV.hr {
     border-top: 1px dashed #AAA;
 }
 #res P {
-    line-height: 1;
-    color: #FFFFFF;/*#E8E8E8;*/
-    text-indent: 0px;
-    margin: 4pt 2pt 2pt;
+	line-height: 1.1;
+	color: #FFFFFF; /*#E8E8E8;*/
+	text-indent: 0px;
+	margin: 4pt 2pt 10pt;
 }
 #res P.poem {
     margin-bottom: 10pt;
@@ -956,6 +967,10 @@ DIV.hr {
     color: #9CF;
     text-decoration: none;
 }
+#msg-search {
+	border-bottom: 1px solid #AAA;
+	margin-bottom: 20px;
+}
 .search-res-el h4 {
 	color: #cef;
 	margin-top: 20px;
@@ -964,6 +979,16 @@ DIV.hr {
 .hightlight {
 	color: magenta;
 }
+
+.search-pagin-blok .pagin {
+	text-align: left;
+	border-top: none;
+}
+	.search-pagin-blok .pagin a {
+		font-weight: normal;
+		margin: 0 4pt;
+	}
+
 
 /*Ширина экрана от 768px и выше, от планшета до компьютера*/
 @media only screen and (max-width: 768px){

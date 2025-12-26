@@ -1,4 +1,7 @@
-// let удалено (у тех, которые ещё раз присваиваются, т.к. ошибка возникает, когда через историю браузера возвращаемся назад, при этом заново загружается из кэша app.js и заново инициализируется, хотя он уже был ранее инициализирован (при первой загрузке страницы), и startOnLoad() уже не срабатывает
+/// let удалено (у тех, которые ещё раз присваиваются, т.к. ошибка возникает, когда через историю браузера возвращаемся назад,
+/// при этом заново загружается из кэша app.js и заново инициализируется,
+/// хотя он уже был ранее инициализирован(при первой загрузке страницы), и startOnLoad() уже не срабатывает.
+/// Эта проблема, вроде, решается у unpoly - https://v2.unpoly.com/legacy-scripts
 verApp = "1.0"; // при изменении значения ОБЯЗАТЕЛЬНО необходимо поменять это значение и в MSU.Ext.Shared.ExtService
 domain = "";
 hostname = typeof hostname !== 'undefined' && hostname !== "" ? hostname : "";
@@ -448,7 +451,9 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
 
     // при каждом новом переходе по ссылке кроме основного контента подгружается дополнительный - ext и пр.
     if (detail.boosted
-        && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote" && detail.triggeringEvent.type !== "submit") {
+        && detail.triggeringEvent.type !== "msu-ext-data" && detail.triggeringEvent.type !== "msu-ext-quote"
+        && detail.triggeringEvent.type !== "submit" && detail.elt.dataset.msuPaginel !== "true" /// это для поиска
+    ) {
         if (!callTriggerExtWhenChangePage(url))
             detail.headers["msu-addclient"] = true;
     }
@@ -1058,7 +1063,7 @@ function getURL(path, newHostname, withoutBase) {
 // подмена (для htmx) расширения отправляемого запроса на .spa
 function replaceExt(detail, url) {
     return (sendExtSPA
-        && (!detail.triggeringEvent || detail.triggeringEvent.type !== "submit")
+        && (!detail.triggeringEvent || detail.triggeringEvent.type !== "submit") && detail.elt.dataset.msuPaginel !== "true" /// это для поиска
         && (
             detail.boosted
             || (detail.triggeringEvent && detail.triggeringEvent.type === triggerOnload)
